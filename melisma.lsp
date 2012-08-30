@@ -57,9 +57,10 @@
 (defun output-note (note)
   (typecase note
     (symbol (format nil "~(~a~)" note))
-    (list (case (first note)
-	    (up (format nil "~(~a~)'" (output-note (second note))))
-	    (down (format nil "~(~a~)," (output-note (second note))))))))
+    (list (if (= (length note) 1) (output-note (first note))
+	      (case (second note)
+		(up (format nil "~(~a~)'" (output-note (second note))))
+		(down (format nil "~(~a~)," (output-note (second note))))))))
 
 (defassert output-note-a (output-note 'a) "a")
 (defassert output-note-a-high (output-note '(up a)) "a'")
