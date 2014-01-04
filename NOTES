@@ -1,0 +1,134 @@
+Layers of abstraction in music:
+
+0. Sound waves
+Music is made of adding time-shifted frequencies (with specific
+durations) together. Middle C is around 261.6 Hz
+
+1. Notes
+If you consider "One frequency, played at a particular time and
+lasting for a particular duration" to be the simplest grouping in (0),
+you can use that as a "note". Notes can then be sequenced, played
+together, and so on.
+
+Notes are labeled by dividing the frequency space into "octaves",
+which repeat, with notes of the same name but different octaves being
+reached by multiplying or dividing by 2 repeatedly.
+
+2. Keys
+To name notes (in standard Western music, at least) we divide an
+octave up into 12 "semitones". We then choose a starting frequency,
+and advance across the octave by adding one or two semitones at a
+time. The sequence is 2, 2, 1, 2, 2, 2, 1, so, in a C major chord:
+
+Note | Absolute interval (Semitone offset)
+-----|--------
+ C   | 0
+ D   | 2
+ E   | 4
+ F   | 5
+ G   | 7
+ A   | 9
+ B   | 11
+ C   | 12
+
+This makes the second C be 12 semitones, one octave, above the first.
+
+The starting note is called the "tonic".
+
+[ Examination: G major
+Next in the Circle of Fifths from C major.
+
+Note | Absolute interval (Semitone offset)
+-----|--------
+ G   | 0
+ A   | 2
+ B   | 4
+ C   | 5
+ D   | 7
+ E   | 9
+ F#  | 11
+ G   | 12
+
+The semitone offsets are the same.
+
+The labels are: A, A#, B, C, C#, D, D#, E, F, F#, G, G#
+
+There are twelve of these, one for each semitone in the octave, and
+seven notes in a scale (8 counting the octave tonic)
+
+The seven notes *used* in a key are the ones that lie at 0, 2, 4, 5,
+7, 9, and 11 semitones from the tonic. The ones that are sharped tell
+you the key signature. In C, the lack of a sharp between B and C and
+between E and F lines up with the 1-offset notes, which is why the key
+is natural.
+
+The circle of fifths works by choosing the tonic that is needed to
+increase the number of sharps used by one each time. That's the only
+reason for G to follow C, and D to follow that, and so on.
+
+Key of B major:
+B  0
+C# 2
+D# 4
+E  5
+F# 7
+G# 9
+A# 11
+B  12
+
+Key signature: Sharp C, D, F, G, A
+
+Key of F# major:
+F# 0
+G# 2
+A# 4
+B  5
+C# 7
+D# 9
+F  11
+F# 12
+
+Still follows, just happen to need to start on a sharp, now.
+
+As a flat:
+Notes: A, Bb, B, C, Db, D, Eb, E, F, Gb, G, Ab
+
+Key of Gb major:
+Gb 0
+Ab 2
+Bb 4
+B  5
+Db 7
+Eb 9
+F  11
+Gb 12
+
+Key signature: Flat G, A, B, D, E
+
+Note: For some weird reason, the B is written as Cb for this scale
+(which you can see in the note list means the same thing).
+
+Key of F major:
+F  0
+G  2
+A  4
+Bb 5 - or A#?
+C  7
+D  9
+E  11
+F  12
+
+2. Chords
+A chord is a set of two or more notes played together (or separated in
+time).
+
+Triad - a chord with three notes. They are:
+The "root", a starting note
+The "third", three (minor chord) or four (major chord) semitones up
+from the root
+The "fifth", seven semitones up from the root
+
+In addition, there are "dimished" and "augmented" chords. Diminished
+is like minor, but the fifth is only six semitones from the root, and
+augmented is like major, but the fifth is eight semitones up.
+
