@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import math
 import sys
 
 note_letters = ["c", "des", "d", "ees", "e", "f", "ges", "g", "aes", "a",
@@ -34,6 +35,16 @@ class Tempo(object):
     def write(self):
         return "\\tempo 4 = " + str(self.bpm)
 
+def composition(n):
+    powers = []
+    i = math.floor(math.log(n, 2))
+    while i >= 0:
+        if 2**i <= n:
+            powers.append(int(2**i))
+            n -= 2**i
+        i -= 1
+    return powers
+
 class Note(object):
     """A note is a pitch and a duration. The pitch is stored as a number of
 semitones offset from the current key signature.
@@ -43,16 +54,28 @@ This class also encodes rests, by using None for the pitch."""
     pitch = None # Semitones away from current key, or None for a rest
     duration = 1.0 # Beats
     voice = 0 # Each voice advances along the beats with only its own notes
+    attrs = [] # Other special qualities
 
-    def __init__(self, pitch, duration, voice=0):
+    def __init__(self, pitch, duration, voice=0, attrs=[]):
         self.pitch = pitch
         self.duration = duration
         self.voice = voice
+        self.attrs = attrs
 
     def write(self, key):
+        durations = []
+        if self.duration >= 1:
+            durations = map(lambda x: int(round(4/x)),
+                            composition(self.duration))
+        else:
+            durations = [int(4 / self.duration)]
+            
         note_type = int (round(4 / self.duration))
         if self.pitch == None:
-            return "r%d" % note_type
+            rests = []
+            for duration in durations:
+                rests.append ("r" + str(duration))
+            return ' '.join(rests)
 
         octave = (key.pitch + self.pitch) / 12
         if octave < 0:
@@ -60,9 +83,16 @@ This class also encodes rests, by using None for the pitch."""
             octave += 1
         else:
             octave_char = "'"
-        return "%s%s%d" % (self.pitch_class(key),
-                           octave_char * abs(octave),
-                           note_type)
+        notes = []
+        for duration in durations:
+            notes.append ("%s%s%d" % (self.pitch_class(key),
+                                      octave_char * abs(octave),
+                                      duration))
+        description = "~ ".join(notes)
+
+        if "dotted" in self.attrs:
+            description += "."
+        return description
 
     def pitch_class(self, key):
         interval = (key.pitch + self.pitch) % 12
@@ -184,7 +214,7 @@ def phrase(music, quality="major"):
 
 
 def main():
-    music = Piece(KeySig.name("c", 1), Tempo(120))
+    music = Piece(KeySig.name("g", 1), Tempo(120))
 
     phrase(music)
     phrase(music)

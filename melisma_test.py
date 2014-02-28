@@ -3,6 +3,11 @@
 import melisma
 import unittest
 
+class UtilityTestCase(unittest.TestCase):
+    def test_composition(self):
+        self.assertEqual(melisma.composition(4), [4])
+        self.assertEqual(melisma.composition(13), [8, 4, 1])
+
 class KeySigTestCase(unittest.TestCase):
     def test_name(self):
         key = melisma.KeySig.name("c")
@@ -40,6 +45,11 @@ class NoteTestCase(unittest.TestCase):
         self.assertEqual(melisma.Note(-13, 0.25).write(key), "b,16")
 
         self.assertEqual(melisma.Note(None, 0.25).write(key), "r16")
+
+        self.assertEqual(melisma.Note(0, 3).write(key), "c2~ c4")
+
+        self.assertEqual(melisma.Note(0, 1, attrs=["dotted"]).write(key),
+                         "c4.")
 
     def test_pitch_class(self):
         key = melisma.KeySig(0)
