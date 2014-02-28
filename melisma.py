@@ -60,7 +60,10 @@ This class also encodes rests, by using None for the pitch."""
         self.pitch = pitch
         self.duration = duration
         self.voice = voice
-        self.attrs = attrs
+        if type(attrs) == list:
+            self.attrs = attrs
+        else:
+            self.attrs = [attrs]
 
     def write(self, key):
         durations = []
@@ -92,6 +95,8 @@ This class also encodes rests, by using None for the pitch."""
 
         if "dotted" in self.attrs:
             description += "."
+        if "fermata" in self.attrs:
+            description += "\\fermata"
         return description
 
     def pitch_class(self, key):
@@ -167,12 +172,13 @@ defined above."""
     def push_rest(self, duration, voice=0):
         self.music.append(Note(None, duration, voice))
 
-    def push_key_note(self, step, duration, voice=0):
+    def push_key_note(self, step, duration, voice=0, attrs=[]):
         """Push a particular note of the current key signature."""
         interval = step_to_interval(step)
-        self.push(Note(interval, duration, voice))
+        self.push(Note(interval, duration, voice=voice, attrs=attrs))
 
-    def push_triad_note(self, root, step, duration, quality="major", voice=0):
+    def push_triad_note(self, root, step, duration, quality="major", voice=0,
+                        attrs=[]):
         """Push a particular note of a triad chord."""
         if step == 0:
             interval = 0
@@ -197,7 +203,7 @@ defined above."""
         else:
             raise ValueError("Step must be 0, 1, or 2 for a triad chord")
 
-        self.push(Note(root + interval, duration, voice))
+        self.push(Note(root + interval, duration, voice=voice, attrs=attrs))
 
 def phrase(music, quality="major"):
     music.push_triad_note(0, 0, 1, voice=0, quality=quality)
@@ -225,7 +231,9 @@ def main():
     music.push(KeySig.name("c", 1))
     phrase(music)
     phrase(music, "diminished")
-    
+
+    music.push_key_note(0, 3, attrs=["fermata"])
+
     music.write ()
 
 if __name__ == "__main__":

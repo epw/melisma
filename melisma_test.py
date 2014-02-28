@@ -47,6 +47,7 @@ class NoteTestCase(unittest.TestCase):
         self.assertEqual(melisma.Note(None, 0.25).write(key), "r16")
 
         self.assertEqual(melisma.Note(0, 3).write(key), "c2~ c4")
+        self.assertEqual(melisma.Note(None, 3).write(key), "r2 r4")
 
         self.assertEqual(melisma.Note(0, 1, attrs=["dotted"]).write(key),
                          "c4.")
