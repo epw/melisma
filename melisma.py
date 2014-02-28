@@ -1,5 +1,8 @@
 #! /usr/bin/env python
 
+note_letters = ["c", "des", "d", "ees", "e", "f", "ges", "g", "aes", "a",
+                "bes", "b"]
+
 class KeySig(object):
     """The current key signature is kept as a number of semitones from middle
 C."""
@@ -9,8 +12,7 @@ C."""
         self.pitch = pitch
 
     def pitch_class(self):
-        return ["c", "g", "d", "a", "e", "b", "ges", "des", "aes", "ees",
-                "bes", "f"][self.pitch % 12]
+        return note_letters[self.pitch % 12]
 
 class Tempo(object):
     """The tempo is a number of beats per minute."""
@@ -19,9 +21,6 @@ class Tempo(object):
 
     def __init__(self, bpm=120):
         self.bpm = bpm
-
-note_letters = ["c", "des", "d", "ees", "e", "f", "ges", "g", "aes", "a",
-                "bes", "b"]
 
 class Note(object):
     """A note is a pitch and a duration. The pitch is stored as a number of
@@ -62,6 +61,7 @@ defined above."""
         self.music = [key, tempo]
 
     def push(self, obj):
+        """Add any object to the music."""
         self.music.append(obj)
 
     def current_key(self):
@@ -70,26 +70,42 @@ defined above."""
             if type(element) == KeySig:
                 return element
 
-def main():
-    music = Piece(KeySig(0), Tempo(120))
-    for pitch in range(13):
-        music.push(Note(pitch, 0.5))
+    def _step_to_interval(self, step):
+        if step < 3:
+            return step * 2
+        elif step < 7:
+            return step * 2 - 1
+        return 12
 
+    def push_key_note(self, step, duration):
+        """Push a particular note of the current key signature."""
+        interval = self._step_to_interval(step)
+        note = Note(interval, duration)
+        self.push(note)
 
-    print """\\version "2.16.0"
+    def write(self):
+        print """\\version "2.16.0"
 \\score {
   \\new Staff \\with {midiInstrument = #"acoustic grand"}
   {"""
-    for element in music.music:
-        if type(element) == KeySig:
-            print "    \\key " + element.pitch_class() + " \\major"
-        elif type(element) == Tempo:
-            print "    \\tempo 4 = " + str(element.bpm)
-        elif type(element) == Note:
-            print "    " + element.write(music.current_key())
-    print """  }
+        for element in self.music:
+            if type(element) == KeySig:
+                print "    \\key " + element.pitch_class() + " \\major"
+            elif type(element) == Tempo:
+                print "    \\tempo 4 = " + str(element.bpm)
+            elif type(element) == Note:
+                print "    " + element.write(self.current_key())
+        print """  }
+  \\layout { }
   \\midi { }
 }"""
+
+def main():
+    music = Piece(KeySig(18), Tempo(120))
+    for step in range(8):
+        music.push_key_note(step, 0.25)
+
+    music.write ()
 
 if __name__ == "__main__":
     main()
