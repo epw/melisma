@@ -11,6 +11,9 @@ C."""
     def __init__(self, pitch=0):
         self.pitch = pitch
 
+    def write(self, _=None):
+        return "\\key " + self.pitch_class() + " \\major"
+
     def pitch_class(self):
         return note_letters[self.pitch % 12]
 
@@ -21,6 +24,9 @@ class Tempo(object):
 
     def __init__(self, bpm=120):
         self.bpm = bpm
+
+    def write(self, _=None):
+        return "\\tempo 4 = " + str(self.bpm)
 
 class Note(object):
     """A note is a pitch and a duration. The pitch is stored as a number of
@@ -35,10 +41,6 @@ This class also encodes rests, by using None for the pitch."""
         self.pitch = pitch
         self.duration = duration
 
-    def pitch_class(self, key):
-        interval = (key.pitch + self.pitch) % 12
-        return note_letters[interval]
-
     def write(self, key):
         octave = (key.pitch + self.pitch) / 12
         if octave < 0:
@@ -50,6 +52,10 @@ This class also encodes rests, by using None for the pitch."""
                            octave_char * abs(octave),
                            int(round(4 / self.duration)))
 
+    def pitch_class(self, key):
+        interval = (key.pitch + self.pitch) % 12
+        return note_letters[interval]
+
 class Piece(object):
     """A Piece is a piece of music, represented as a list of the objects
 defined above."""
@@ -59,6 +65,18 @@ defined above."""
     def __init__(self, key, tempo):
         """All music must start with a key and a tempo."""
         self.music = [key, tempo]
+
+    def write(self):
+        print """\\version "2.16.0"
+\\score {
+  \\new Staff \\with {midiInstrument = #"acoustic grand"}
+  {"""
+        for element in self.music:
+            print "    " + element.write(self.current_key())
+        print """  }
+  \\layout { }
+  \\midi { }
+}"""
 
     def push(self, obj):
         """Add any object to the music."""
@@ -80,30 +98,38 @@ defined above."""
     def push_key_note(self, step, duration):
         """Push a particular note of the current key signature."""
         interval = self._step_to_interval(step)
-        note = Note(interval, duration)
-        self.push(note)
+        self.push(Note(interval, duration))
 
-    def write(self):
-        print """\\version "2.16.0"
-\\score {
-  \\new Staff \\with {midiInstrument = #"acoustic grand"}
-  {"""
-        for element in self.music:
-            if type(element) == KeySig:
-                print "    \\key " + element.pitch_class() + " \\major"
-            elif type(element) == Tempo:
-                print "    \\tempo 4 = " + str(element.bpm)
-            elif type(element) == Note:
-                print "    " + element.write(self.current_key())
-        print """  }
-  \\layout { }
-  \\midi { }
-}"""
+    def push_triad_note(self, root, step, duration, quality="major"):
+        """Push a particular note of a triad chord."""
+        if step == 0:
+            interval = 0
+        elif step == 1:
+            if quality == "major" or quality == "augmented":
+                interval = 4
+            elif quality == "minor" or quality == "diminished":
+                interval = 3
+            else:
+                raise ValueError("Quality must be major, minor, diminished, or augmented")
+        elif step == 2:
+            if quality == "major" or quality == "minor":
+                interval = 7
+            elif quality == "diminished":
+                interval = 6
+            elif quality == "augmented":
+                interval = 8
+            else:
+                raise ValueError("Quality must be major, minor, diminished, or augmented")
+        else:
+            raise ValueError("Step must be 0, 1, or 2 for a triad chord")
+
+        self.push(Note(root + interval, duration))
 
 def main():
-    music = Piece(KeySig(18), Tempo(120))
-    for step in range(8):
-        music.push_key_note(step, 0.25)
+    music = Piece(KeySig(12), Tempo(120))
+    music.push_triad_note(0, 0, 0.5)
+    music.push_triad_note(0, 1, 0.5)
+    music.push_triad_note(0, 2, 0.5)
 
     music.write ()
 
