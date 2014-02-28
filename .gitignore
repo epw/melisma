@@ -1,3 +1,6 @@
 *~
 *.fasl
 *.pyc
+*.midi
+*.pdf
+*.ly

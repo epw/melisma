@@ -9,8 +9,8 @@ C."""
         self.pitch = pitch
 
     def pitch_class(self):
-        return ["C", "G", "D", "A", "E", "B", "Ges", "Des", "Aes", "Ees",
-                "Bes", "F"][self.pitch % 12]
+        return ["c", "g", "d", "a", "e", "b", "ges", "des", "aes", "ees",
+                "bes", "f"][self.pitch % 12]
 
 class Tempo(object):
     """The tempo is a number of beats per minute."""
@@ -19,6 +19,9 @@ class Tempo(object):
 
     def __init__(self, bpm=120):
         self.bpm = bpm
+
+note_letters = ["c", "des", "d", "ees", "e", "f", "ges", "g", "aes", "a",
+                "bes", "b"]
 
 class Note(object):
     """A note is a pitch and a duration. The pitch is stored as a number of
@@ -35,8 +38,18 @@ This class also encodes rests, by using None for the pitch."""
 
     def pitch_class(self, key):
         interval = (key.pitch + self.pitch) % 12
-        return ["C", "Des", "D", "Ees", "E", "F", "Ges", "G", "Aes", "A",
-                "Bes", "B"][interval]
+        return note_letters[interval]
+
+    def write(self, key):
+        octave = (key.pitch + self.pitch) / 12
+        if octave < 0:
+            octave_char = ","
+            octave += 1
+        else:
+            octave_char = "'"
+        return "%s%s%d" % (self.pitch_class(key),
+                           octave_char * abs(octave),
+                           int(round(4 / self.duration)))
 
 class Piece(object):
     """A Piece is a piece of music, represented as a list of the objects
@@ -59,8 +72,8 @@ defined above."""
 
 def main():
     music = Piece(KeySig(0), Tempo(120))
-    for pitch in range(12):
-        music.push(Note(pitch, 1))
+    for pitch in range(13):
+        music.push(Note(pitch, 0.5))
 
 
     print """\\version "2.16.0"
@@ -69,12 +82,14 @@ def main():
   {"""
     for element in music.music:
         if type(element) == KeySig:
-            pass # Need to implement
+            print "    \\key " + element.pitch_class() + " \\major"
         elif type(element) == Tempo:
-            print "  \\tempo 4 = " + str(element.bpm)
+            print "    \\tempo 4 = " + str(element.bpm)
         elif type(element) == Note:
-            print "  "
-
+            print "    " + element.write(music.current_key())
+    print """  }
+  \\midi { }
+}"""
 
 if __name__ == "__main__":
     main()
