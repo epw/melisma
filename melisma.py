@@ -13,6 +13,10 @@ C."""
     def __init__(self, pitch=0):
         self.pitch = pitch
 
+    @classmethod
+    def name(cls, letter, octave=0):
+        return KeySig(note_letters.index(letter) + octave * 12)
+
     def write(self):
         return "\\key " + self.pitch_class() + " \\major"
 
@@ -138,7 +142,7 @@ defined above."""
         interval = step_to_interval(step)
         self.push(Note(interval, duration, voice))
 
-    def push_triad_note(self, root, step, duration, voice=0, quality="major"):
+    def push_triad_note(self, root, step, duration, quality="major", voice=0):
         """Push a particular note of a triad chord."""
         if step == 0:
             interval = 0
@@ -165,28 +169,32 @@ defined above."""
 
         self.push(Note(root + interval, duration, voice))
 
-def phrase(music):
-    music.push_triad_note(0, 0, 1, voice=0)
-    music.push_triad_note(0, 1, 1, voice=1)
+def phrase(music, quality="major"):
+    music.push_triad_note(0, 0, 1, voice=0, quality=quality)
+    music.push_triad_note(0, 1, 1, voice=1, quality=quality)
     music.push_rest(2, voice=1)
     music.push_rest(1, voice=1)
-    music.push_triad_note(0, 2, 1, voice=2)
+    music.push_triad_note(0, 2, 1, voice=2, quality=quality)
     music.push_rest(2, voice=2)
     music.push_rest(1, voice=2)
 
-    music.push_triad_note(0, 1, 1, voice=0)
-    music.push_triad_note(0, 2, 1, voice=0)
+    music.push_triad_note(0, 1, 1, voice=0, quality=quality)
+    music.push_triad_note(0, 2, 1, voice=0, quality=quality)
     music.push_rest(1, voice=0)
 
 
 def main():
-    music = Piece(KeySig(12), Tempo(120))
+    music = Piece(KeySig.name("c", 1), Tempo(120))
 
     phrase(music)
     phrase(music)
     phrase(music)
-    music.push(KeySig(14))
+    music.push(KeySig.name("d", 1))
     phrase(music)
+    phrase(music)
+    music.push(KeySig.name("c", 1))
+    phrase(music)
+    phrase(music, "diminished")
     
     music.write ()
 

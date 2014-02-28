@@ -4,6 +4,16 @@ import melisma
 import unittest
 
 class KeySigTestCase(unittest.TestCase):
+    def test_name(self):
+        key = melisma.KeySig.name("c")
+        self.assertEqual(key.pitch, 0)
+
+        key = melisma.KeySig.name("d")
+        self.assertEqual(key.pitch, 2)
+
+        key = melisma.KeySig.name("c", 1)
+        self.assertEqual(key.pitch, 12)
+
     def test_write(self):
         key = melisma.KeySig(0)
         self.assertEqual(key.write(), "\\key c \\major")
@@ -80,18 +90,18 @@ class PieceTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             music.push_triad_note(0, 3, 1)
 
-        music.push_triad_note(0, 1, 1, "minor")
+        music.push_triad_note(0, 1, 1, quality="minor")
         self.assertEqual(music.music[-1].write(music.current_key()), "ees4")
-        music.push_triad_note(0, 1, 1, "diminished")
+        music.push_triad_note(0, 1, 1, quality="diminished")
         self.assertEqual(music.music[-1].write(music.current_key()), "ees4")
-        music.push_triad_note(0, 1, 1, "augmented")
+        music.push_triad_note(0, 1, 1, quality="augmented")
         self.assertEqual(music.music[-1].write(music.current_key()), "e4")
 
-        music.push_triad_note(0, 2, 1, "minor")
+        music.push_triad_note(0, 2, 1, quality="minor")
         self.assertEqual(music.music[-1].write(music.current_key()), "g4")
-        music.push_triad_note(0, 2, 1, "diminished")
+        music.push_triad_note(0, 2, 1, quality="diminished")
         self.assertEqual(music.music[-1].write(music.current_key()), "ges4")
-        music.push_triad_note(0, 2, 1, "augmented")
+        music.push_triad_note(0, 2, 1, quality="augmented")
         self.assertEqual(music.music[-1].write(music.current_key()), "aes4")
 
 if __name__ == "__main__":
