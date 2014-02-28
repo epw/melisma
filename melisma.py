@@ -110,7 +110,8 @@ defined above."""
             elif quality == "minor" or quality == "diminished":
                 interval = 3
             else:
-                raise ValueError("Quality must be major, minor, diminished, or augmented")
+                raise ValueError("Quality must be major, minor, diminished, "
+                                 + "or augmented")
         elif step == 2:
             if quality == "major" or quality == "minor":
                 interval = 7
@@ -119,7 +120,8 @@ defined above."""
             elif quality == "augmented":
                 interval = 8
             else:
-                raise ValueError("Quality must be major, minor, diminished, or augmented")
+                raise ValueError("Quality must be major, minor, diminished, "
+                                 + "or augmented")
         else:
             raise ValueError("Step must be 0, 1, or 2 for a triad chord")
 
