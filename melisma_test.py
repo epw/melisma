@@ -29,6 +29,8 @@ class NoteTestCase(unittest.TestCase):
         self.assertEqual(melisma.Note(-1, 0.5).write(key), "b8")
         self.assertEqual(melisma.Note(-13, 0.25).write(key), "b,16")
 
+        self.assertEqual(melisma.Note(None, 0.25).write(key), "r16")
+
     def test_pitch_class(self):
         key = melisma.KeySig(0)
 
