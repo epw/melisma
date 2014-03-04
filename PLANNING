@@ -1,2 +1,13 @@
-Give NOTES:
+Given NOTES:
 
+Want a domain-specific language for specifying music.
+
+Basic form should be a simple function that processes arguments and
+adds something to a data structure. This will let them be used in
+loops and functions and other abstractions.
+
+Fundamental pieces should not be tied to contemporary music notation,
+but helper functions should be provided (so I can say things like "C
+major chord" if I want to)
+
+Willing to 
