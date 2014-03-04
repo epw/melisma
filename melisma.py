@@ -121,7 +121,7 @@ defined above."""
         self.music = [key, tempo]
 
     def write(self):
-        print """\\version "2.16.0"
+        print """\\version "2.14.0"
 \\score {
   \\new Staff \\with {midiInstrument = #"acoustic grand"}
   {"""
