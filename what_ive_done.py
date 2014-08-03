@@ -15,7 +15,7 @@ def high_phrase (music):
     music.push_key_note(2, .25)
 
 def main():
-    music = Piece(KeySig.name("bes", 2), Tempo(80))
+    music = Piece(KeySig.name("bes", 2), Tempo(70))
 
     high_phrase(music)
     music.push_rest(4, 1)
