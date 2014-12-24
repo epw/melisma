@@ -6,7 +6,11 @@ import sys
 note_letters = ["c", "des", "d", "ees", "e", "f", "ges", "g", "aes", "a",
                 "bes", "b"]
 
-class KeySig(object):
+class Component(object):
+    """Parent class for allowed members of music list."""
+    pass
+
+class KeySig(Component):
     """The current key signature is kept as a number of semitones from middle
 C."""
     pitch = 0 # Semitones away from middle C
@@ -24,7 +28,7 @@ C."""
     def pitch_class(self):
         return note_letters[self.pitch % 12]
 
-class Tempo(object):
+class Tempo(Component):
     """The tempo is a number of beats per minute."""
 
     bpm = 120 # Beats per minute
@@ -45,7 +49,7 @@ def composition(n):
         i -= 1
     return powers
 
-class Note(object):
+class Note(Component):
     """A note is a pitch and a duration. The pitch is stored as a number of
 semitones offset from the current key signature.
 
@@ -115,16 +119,27 @@ class Piece(object):
 defined above."""
 
     music = []
+    instrument = "acoustic grand"
 
-    def __init__(self, key, tempo):
+    def __init__(self, key, tempo, output=sys.stdout):
         """All music must start with a key and a tempo."""
         self.music = [key, tempo]
+        self.instrument = "acoustic grand"
+        self.output = output
+        self.alias()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, unused_type, unused_value, unused_traceback):
+        self.write()
 
     def write(self):
-        print """\\version "2.14.0"
+        self.output.write("""\\version "2.14.0"
 \\score {
-  \\new Staff \\with {midiInstrument = #"acoustic grand"}
-  {"""
+  \\new Staff \\with {midiInstrument = #"%s"}
+  {
+""" % self.instrument)
         writing_music = self.music[:]
         key = None
         while writing_music:
@@ -139,25 +154,33 @@ defined above."""
                     while len(voices) <= note.voice:
                         voices.append([])
                     voices[note.voice].append(note)
-                print "    <<"
+                self.output.write("    <<\n")
                 n = 0
                 for voice in voices:
                     n += 1
-                    print "      {"
+                    self.output.write("      {\n")
                     for note in voice:
-                        print "        " + note.write(key)
-                    print "      }"
+                        self.output.write("        " + note.write(key) + "\n")
+                    self.output.write("      }\n")
                     if n < len(voices) - 1:
-                        print r"      \\"
-                print "    >>"
+                        self.output.write(r"      \\" + "\n")
+                self.output.write("    >>\n")
             else:
                 if type(element) == KeySig:
                     key = element
-                print "    " + element.write()
-        print """  }
+                self.output.write("    " + element.write() + "\n")
+        self.output.write("""  }
   \\layout { }
   \\midi { }
-}"""
+}
+""")
+
+    def alias(self):
+        """Give shorter names to common API methods."""
+        self.key = self.current_key
+        self.pr = self.push_rest
+        self.pkn = self.push_key_note
+        self.ptn = self.push_triad_note
 
     def current_key(self):
         """Get the most recently set key."""
@@ -204,6 +227,7 @@ defined above."""
             raise ValueError("Step must be 0, 1, or 2 for a triad chord")
 
         self.push(Note(root + interval, duration, voice=voice, attrs=attrs))
+
 
 def phrase(music, quality="major"):
     music.push_triad_note(0, 0, 1, voice=0, quality=quality)
