@@ -13,13 +13,13 @@
   (dolist (note notes)
     (note 4 note)))
 
-(defphrase a (&optional variation)
+(defun a (&optional variation)
   (quarter-notes :g :b :d)
   (if (eq variation 'recap)
       (note 4 :r)
       (note 4 :g 1)))
 
-(defphrase b ()
+(defun b ()
   (note 1 :b -1))
 
 ;; (defpiece piece ()
@@ -38,12 +38,7 @@
 
 (defun bass ()
   (dotimes (i 8)
-    (note 1 :e)))
-
-(defun simul (&rest phrases)
-  (let ((main-length (phrase-length (first phrases))))
-    (assert (every (lambda (p) (= main-length (phrase-length p))) (rest phrases))))
-  (mapcar #'funcall phrases))
+    (note 1 :e -1)))
 
 (defpiece piece ()
   (simul #'treble #'bass))

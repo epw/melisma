@@ -2,13 +2,16 @@
   (:use #:cl #:eric)
   (:export #:*notes*
 	   #:*base-octave*
+	   #:*current-voice*
 	   #:note
 	   #:note-duration
 	   #:note-pitch
 	   #:note-octave
+	   #:note-voice
 	   #:defphrase
 	   #:phrase-length
 	   #:repeat
+	   #:simul
 	   #:defpiece
 	   #:synth))
 
@@ -20,14 +23,17 @@
 
 (defvar *notes*)
 (defvar *base-octave* 0)
+(defvar *current-voice* 0)
 
 (defstruct note
   duration
   pitch
-  (octave 0))
+  (octave 0)
+  (voice 0))
 
 (defun note (duration pitch &optional (octave 0))
-  (push (make-note :duration duration :pitch pitch :octave (+ *base-octave* octave))
+  (push (make-note :duration duration :pitch pitch :octave (+ *base-octave* octave)
+		   :voice *current-voice*)
 	*notes*))
 
 (defmacro defphrase (name args &body body)
@@ -44,6 +50,13 @@
      ,@body
      ,@body))
 
+(defun simul (&rest phrases)
+  (let ((main-length (phrase-length (first phrases))))
+    (assert (every (lambda (p) (= main-length (phrase-length p))) (rest phrases))))
+  (loop for phrase in phrases for i = 0 then (1+ i) do
+       (let ((*current-voice* i))
+	 (funcall phrase))))
+
 (defmacro defpiece (name args &body body)
   `(defun ,name ,args
      (let ((*notes* (list)))
@@ -57,9 +70,22 @@
 	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))))
 
 (defun render (f notes)
-  (dolist (note notes)
-    (format f "    ~(~a~)~a~a~%" (note-pitch note) (octave-marks note)
-	    (note-duration note))))
+  (let ((voices (remove-duplicates (mapcar #'note-voice notes))))
+    (if (> (length voices) 1)
+	(format f "      <<~%"))
+    (dolist (voice voices)
+      (if (> (length voices) 1)
+	  (format f "        {~%"))
+      (dolist (note (remove-if-not (lambda (n) (eq (note-voice n) voice)) notes))
+	(format f "    ~(~a~)~a~a~%" (note-pitch note) (octave-marks note)
+		(note-duration note)))
+      (when (> (length voices) 1)
+	(format f "        }~%")
+	(if (not (eq voice (car (last voices))))
+	    (format f "      \\\\~%"))))
+    (if (> (length voices) 1)
+	(format f "      >>~%"))))
+
 
 (defun write-lilypond (filename piece instrument)
   (eric:fopen (f filename :w)
