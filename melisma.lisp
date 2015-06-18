@@ -7,8 +7,9 @@
 	   #:note-pitch
 	   #:note-octave
 	   #:defphrase
-	   #:defpiece
+	   #:phrase-length
 	   #:repeat
+	   #:defpiece
 	   #:synth))
 
 (in-package #:melisma)
@@ -20,10 +21,6 @@
 (defvar *notes*)
 (defvar *base-octave* 0)
 
-(defmacro defphrase (name args &body body)
-  `(defun ,name ,args
-     ,@body))
-
 (defstruct note
   duration
   pitch
@@ -32,6 +29,14 @@
 (defun note (duration pitch &optional (octave 0))
   (push (make-note :duration duration :pitch pitch :octave (+ *base-octave* octave))
 	*notes*))
+
+(defmacro defphrase (name args &body body)
+  `(defun ,name ,args
+     ,@body))
+
+(defun phrase-length (piece-fun &rest args)
+  (let ((*notes* (list)))
+    (loop for note in (apply piece-fun args) summing (/ 4 (note-duration note)))))
 
 (defmacro repeat (&body body)
   `(progn
