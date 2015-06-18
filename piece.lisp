@@ -9,10 +9,12 @@
 
 ;; As always, we've got to figure out multiple notes.
 
+(defun quarter-notes (&rest notes)
+  (dolist (note notes)
+    (note 4 note)))
+
 (defphrase a (&optional variation)
-  (note 4 :g)
-  (note 4 :b)
-  (note 4 :d)
+  (quarter-notes :g :b :d)
   (if (eq variation 'recap)
       (note 4 :r)
       (note 4 :g 1)))
@@ -20,15 +22,31 @@
 (defphrase b ()
   (note 1 :b -1))
 
+;; (defpiece piece ()
+;;   (let ((*base-octave* 1))
+;;     (repeat (a))
+;;     (repeat
+;;       (b)
+;;       (a 'recap))
+;;     (note 4 :d)
+;;     (note 4 :b)
+;;     (note 2 :g)))
+
+(defun treble ()
+  (dotimes (i 32)
+    (note 4 :c)))
+
+(defun bass ()
+  (dotimes (i 8)
+    (note 1 :e)))
+
+(defun simul (&rest phrases)
+  (let ((main-length (phrase-length (first phrases))))
+    (assert (every (lambda (p) (= main-length (phrase-length p))) (rest phrases))))
+  (mapcar #'funcall phrases))
+
 (defpiece piece ()
-  (let ((*base-octave* 1))
-    (repeat (a))
-    (repeat
-      (b)
-      (a 'recap))
-    (note 4 :d)
-    (note 4 :b)
-    (note 2 :g)))
+  (simul #'treble #'bass))
 
 (defun render ()
   (synth "piece" #'piece))

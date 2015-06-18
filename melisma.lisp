@@ -36,7 +36,8 @@
 
 (defun phrase-length (piece-fun &rest args)
   (let ((*notes* (list)))
-    (loop for note in (apply piece-fun args) summing (/ 4 (note-duration note)))))
+    (apply piece-fun args)
+    (loop for note in *notes* summing (/ 4 (note-duration note)))))
 
 (defmacro repeat (&body body)
   `(progn
