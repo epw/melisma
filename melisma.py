@@ -39,6 +39,19 @@ class Tempo(Component):
     def write(self):
         return "\\tempo 4 = " + str(self.bpm)
 
+class TimeSig(Component):
+
+    npm = 4
+    nf = 4
+
+    def __init__(self, notes_per_measure, note_fraction):
+        self.npm = notes_per_measure
+        self.nf = note_fraction
+
+    def write(self):
+        return "\\time %d/%d" % (self.npm, self.nf)
+
+
 def composition(n):
     powers = []
     i = math.floor(math.log(n, 2))
@@ -56,7 +69,7 @@ semitones offset from the current key signature.
 This class also encodes rests, by using None for the pitch."""
 
     pitch = None # Semitones away from current key, or None for a rest
-    duration = 1.0 # Beats
+    duration = None # Type of note as whole number or (numerator, denominator)
     voice = 0 # Each voice advances along the beats with only its own notes
     attrs = [] # Other special qualities
 
@@ -70,40 +83,23 @@ This class also encodes rests, by using None for the pitch."""
             self.attrs = [attrs]
 
     def write(self, key):
-        durations = []
-        if self.duration >= 1:
-            durations = map(lambda x: int(round(4/x)),
-                            composition(self.duration))
-        else:
-            durations = [int(4 / self.duration)]
-            
-        note_type = int (round(4 / self.duration))
-        if self.pitch == None:
-            rests = []
-            for duration in durations:
-                rests.append ("r" + str(duration))
-            return ' '.join(rests)
-
-        octave = (key.pitch + self.pitch) / 12
-        if octave < 0:
-            octave_char = ","
-            octave += 1
-        else:
-            octave_char = "'"
-        notes = []
-        for duration in durations:
-            notes.append ("%s%s%d" % (self.pitch_class(key),
-                                      octave_char * abs(octave),
-                                      duration))
-        description = "~ ".join(notes)
-
-        if "dotted" in self.attrs:
-            description += "."
+        if self.pitch:
+            octave = (key.pitch + self.pitch) / 12
+            if octave < 0:
+                octave_char = ","
+                octave += 1
+            else:
+                octave_char = "'"
+        description = "%s%s%d" % (self.pitch_class(key),
+                                  octave_char * abs(octave),
+                                  duration))
         if "fermata" in self.attrs:
             description += "\\fermata"
         return description
 
     def pitch_class(self, key):
+        if self.pitch == None:
+            return "r"
         interval = (key.pitch + self.pitch) % 12
         return note_letters[interval]
 
@@ -114,6 +110,13 @@ def step_to_interval(step):
         return step * 2 - 1
     return 12
 
+class MeasureException(Exception):
+    def __init__(self, expected, actual):
+        self.expected = expected
+        self.actual = actual
+    def __str__(self):
+        return "Expected %d beats in measure, got %d" % (self.expected, self.actual)
+
 class Piece(object):
     """A Piece is a piece of music, represented as a list of the objects
 defined above."""
@@ -121,9 +124,9 @@ defined above."""
     music = []
     instrument = "acoustic grand"
 
-    def __init__(self, key, tempo, output=sys.stdout):
+    def __init__(self, key, tempo, timesig=None, output=sys.stdout):
         """All music must start with a key and a tempo."""
-        self.music = [key, tempo]
+        self.music = [key, tempo, timesig or TimeSig(4, 4)]
         self.instrument = "acoustic grand"
         self.output = output
         self.alias()
@@ -177,15 +180,17 @@ defined above."""
 
     def alias(self):
         """Give shorter names to common API methods."""
-        self.key = self.current_key
+        self.key = lambda: self.current_element(KeySig)
+        self.tempo = lambda: self.current_element(Tempo)
+        self.time = lambda: self.current_element(TimeSig)
         self.pr = self.push_rest
         self.pkn = self.push_key_note
         self.ptn = self.push_triad_note
 
-    def current_key(self):
-        """Get the most recently set key."""
+    def current_element(self, cls):
+        """Get the most recently set element of a Component class."""
         for element in self.music[::-1]:
-            if type(element) == KeySig:
+            if type(element) == cls:
                 return element
 
     def push(self, obj):
@@ -228,6 +233,8 @@ defined above."""
 
         self.push(Note(root + interval, duration, voice=voice, attrs=attrs))
 
+    def push_measure(self, *notes):
+        pass
 
 def phrase(music, quality="major"):
     music.push_triad_note(0, 0, 1, voice=0, quality=quality)
@@ -241,6 +248,13 @@ def phrase(music, quality="major"):
     music.push_triad_note(0, 1, 1, voice=0, quality=quality)
     music.push_triad_note(0, 2, 1, voice=0, quality=quality)
     music.push_rest(1, voice=0)
+
+
+def lilypond(name):
+    subprocess.call(["/usr/bin/lilypond", "%s.ly" % name])
+
+def timidity(name):
+    subprocess.call(["timidity", "--output-24bit", "-A120", "%s.midi" % name])
 
 
 def main():
