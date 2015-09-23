@@ -1,96 +1,65 @@
 (defpackage #:melisma
-  (:use #:cl #:eric)
-  (:export #:*notes*
-	   #:*base-octave*
-	   #:*current-voice*
-	   #:note
-	   #:note-duration
-	   #:note-pitch
-	   #:note-octave
-	   #:note-voice
-	   #:defphrase
-	   #:phrase-length
-	   #:repeat
-	   #:simul
-	   #:synth))
+  (:use #:cl #:eric))
 
 (in-package #:melisma)
 
-(defun something ()
-  (format t "Do something, not really sure what yet.~%")
-  'something)
-
-(defvar *notes*)
-(defvar *base-octave* 0)
-(defvar *current-voice* 0)
+(defvar *base-pitch*)
 
 (defstruct note
   duration
   pitch
-  (octave 0)
-  (voice 0))
+  (octave 0))
 
-(defun note (duration pitch &optional (octave 0))
-  (push (make-note :duration duration :pitch pitch :octave (+ *base-octave* octave)
-		   :voice *current-voice*)
-	*notes*))
+(defstruct voice
+  notes)
 
-(defmacro defphrase (name args &body body)
-  `(defun ,name ,args
-     ,@body))
+(defmacro piece ((&rest voices) &body body)
+  (let ((voice-definitions (mapcar (lambda (v) (list v '(make-voice))) voices)))
+    `(let ,voice-definitions
+       ,@body
+       (list ,@voices))))
 
-(defun phrase-length (piece-fun &rest args)
-  (let ((*notes* (list)))
-    (apply piece-fun args)
-    (loop for note in *notes* summing (/ 4 (note-duration note)))))
+(defmacro phrase (voice base &rest notes)
+  `(let ((*base-pitch* ,base))
+     (dolist (note (list ,@notes))
+       (push note (voice-notes ,voice)))))
 
-(defmacro repeat (&body body)
-  `(progn
-     ,@body
-     ,@body))
-
-(defun simul (&rest phrases)
-  (let ((main-length (phrase-length (first phrases))))
-    (assert (every (lambda (p) (= main-length (phrase-length p))) (rest phrases))))
-  (loop for phrase in phrases for i = 0 then (1+ i) do
-       (let ((*current-voice* i))
-	 (funcall phrase))))
-
+(defun relative-note (pitch duration)
+  (make-note :pitch (if pitch (+ pitch *base-pitch*) nil)
+	     :duration duration))
+	     
 (defun octave-marks (note)
-  (if (eq (note-pitch note) :r)
-      ""
-      (let ((octave (note-octave note)))
-	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))))
+  (if (note-pitch note)
+      (let ((octave (floor (note-pitch note) 12)))
+	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))
+      ""))
+
+(defun render-pitch (pitch)
+  (if pitch
+      (nth (mod pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b))
+      'r))
 
 (defun render (f notes)
-  (let ((voices (remove-duplicates (mapcar #'note-voice notes))))
-    (if (> (length voices) 1)
-	(format f "      <<~%"))
-    (dolist (voice voices)
-      (if (> (length voices) 1)
-	  (format f "        {~%"))
-      (dolist (note (remove-if-not (lambda (n) (eq (note-voice n) voice)) notes))
-	(format f "    ~(~a~)~a~a~%" (note-pitch note) (octave-marks note)
-		(note-duration note)))
-      (when (> (length voices) 1)
-	(format f "        }~%")
-	(if (not (eq voice (car (last voices))))
-	    (format f "      \\\\~%"))))
-    (if (> (length voices) 1)
-	(format f "      >>~%"))))
+  (format f "        {~%")
+  (dolist (note (reverse notes))
+    (format f "    ~(~a~)~a~a~%" (render-pitch (note-pitch note)) (octave-marks note)
+	    (note-duration note)))
+  (format f "        }~%"))
 
-
-(defun write-lilypond (filename piece instrument)
+(defun write-lilypond (filename piece)
   (eric:fopen (f filename :w)
     (format f "\\version \"2.16.0\"
 \\score {
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = 240~%" instrument "g \\major")
-    (let ((*notes* (list)))
-      (funcall piece)
-      (render f (reverse *notes*)))
+    \\tempo 4 = 240~%" "acoustic grand" "g \\major")
+    (format f "      <<~%")
+    (dolist (voice piece)
+      (render f (voice-notes voice))
+      (unless (equal voice (car (last piece)))
+	(format f "      \\\\~%")))
+    (format f "      >>~%")
     (format f "  }
   \\layout { }
   \\midi { }
@@ -117,7 +86,7 @@
   (format nil "~a.midi" name))
 
 (defun synth (basename piece)
-  (write-lilypond (file-ly basename) piece "acoustic grand")
+  (write-lilypond (file-ly basename) piece)
   (eric:fopen (f (file-ly basename))
     (let ((s (make-string (file-length f))))
       (read-sequence s f)
@@ -129,3 +98,24 @@
   (if (not (zerop (shell-show-errors "timidity" (file-midi basename))))
       (return-from synth)))
 
+
+;; Example music, rather than structure
+
+(defun motive (voice base-pitch)
+  (phrase voice base-pitch (relative-note 0 4) (relative-note 4 4) (relative-note 7 4)
+	  (relative-note nil 4)))
+
+(defun bass-line (voice base-pitch)
+  (phrase voice base-pitch (relative-note nil 4) (relative-note 0 2) (relative-note 0 4)))
+
+(defun experiment ()
+  (synth "music" (piece (v bass)
+		   (motive v 12)
+		   (motive v 14)
+		   (motive v 12)
+		   (motive v 0)
+
+		   (bass-line bass -12)
+		   (bass-line bass -10)
+		   (bass-line bass -12)
+		   (bass-line bass -12))))
