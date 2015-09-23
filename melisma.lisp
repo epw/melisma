@@ -12,7 +12,6 @@
 	   #:phrase-length
 	   #:repeat
 	   #:simul
-	   #:defpiece
 	   #:synth))
 
 (in-package #:melisma)
@@ -57,12 +56,6 @@
        (let ((*current-voice* i))
 	 (funcall phrase))))
 
-(defmacro defpiece (name args &body body)
-  `(defun ,name ,args
-     (let ((*notes* (list)))
-       ,@body
-       (reverse *notes*))))
-
 (defun octave-marks (note)
   (if (eq (note-pitch note) :r)
       ""
@@ -95,7 +88,9 @@
   {
     \\key ~(~a~)
     \\tempo 4 = 240~%" instrument "g \\major")
-    (render f (funcall piece))
+    (let ((*notes* (list)))
+      (funcall piece)
+      (render f (reverse *notes*)))
     (format f "  }
   \\layout { }
   \\midi { }

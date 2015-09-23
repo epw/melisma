@@ -40,7 +40,7 @@
   (dotimes (i 8)
     (note 1 :e -1)))
 
-(defpiece piece ()
+(defun piece ()
   (simul #'treble #'bass))
 
 (defun render ()
