@@ -7,8 +7,7 @@
 
 (defstruct note
   duration
-  pitch
-  (octave 0))
+  pitch)
 
 (defstruct voice
   notes)
@@ -25,12 +24,15 @@
        (push note (voice-notes ,voice)))))
 
 (defun relative-note (pitch duration)
-  (make-note :pitch (if pitch (+ pitch *base-pitch*) nil)
+  (make-note :pitch (typecase pitch
+		      (nil nil)
+		      (list (mapcar (lambda (p) (+ p *base-pitch*)) pitch))
+		      (t (+ pitch *base-pitch*)))
 	     :duration duration))
 	     
-(defun octave-marks (note)
-  (if (note-pitch note)
-      (let ((octave (floor (note-pitch note) 12)))
+(defun octave-marks (pitch)
+  (if pitch
+      (let ((octave (floor pitch 12)))
 	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))
       ""))
 
@@ -39,21 +41,30 @@
       (nth (mod pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b))
       'r))
 
+(defun render-note (note)
+  (if (and (note-pitch note) (listp (note-pitch note)))
+      (format nil "<~{~a~^ ~}>~a"
+	      (mapcar (lambda (p)
+			(format nil "~(~a~)~a" (render-pitch p) (octave-marks p)))
+		      (note-pitch note))
+	      (note-duration note))
+      (format nil "~(~a~)~a~a" (render-pitch (note-pitch note)) (octave-marks (note-pitch note))
+	      (note-duration note))))
+
 (defun render (f notes)
   (format f "        {~%")
   (dolist (note (reverse notes))
-    (format f "    ~(~a~)~a~a~%" (render-pitch (note-pitch note)) (octave-marks note)
-	    (note-duration note)))
+    (format f "    ~a~%" (render-note note)))
   (format f "        }~%"))
 
-(defun write-lilypond (filename piece)
+(defun write-lilypond (filename piece instrument)
   (eric:fopen (f filename :w)
     (format f "\\version \"2.16.0\"
 \\score {
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = 240~%" "acoustic grand" "g \\major")
+    \\tempo 4 = 240~%" instrument "g \\major")
     (format f "      <<~%")
     (dolist (voice piece)
       (render f (voice-notes voice))
@@ -86,7 +97,7 @@
   (format nil "~a.midi" name))
 
 (defun synth (basename piece)
-  (write-lilypond (file-ly basename) piece)
+  (write-lilypond (file-ly basename) piece "acoustic grand")
   (eric:fopen (f (file-ly basename))
     (let ((s (make-string (file-length f))))
       (read-sequence s f)
@@ -102,20 +113,60 @@
 ;; Example music, rather than structure
 
 (defun motive (voice base-pitch)
-  (phrase voice base-pitch (relative-note 0 4) (relative-note 4 4) (relative-note 7 4)
+  (phrase voice base-pitch (relative-note 0 4)
+	  (relative-note 4 4); (relative-note 7 4)
+	  (relative-note (list 0 4 7) 4)
 	  (relative-note nil 4)))
 
 (defun bass-line (voice base-pitch)
   (phrase voice base-pitch (relative-note nil 4) (relative-note 0 2) (relative-note 0 4)))
 
+(defun major-chord (root)
+  (list root (+ root 4) (+ root 7)))
+(defun minor-chord (root)
+  (list root (+ root 3) (+ root 7)))
+(defun augmented-chord (root)
+  (list root (+ root 4) (+ root 8)))
+(defun diminished-chord (root)
+  (list root (+ root 3) (+ root 6)))
+
+(defun wholes-chord (voice pitches)
+  (phrase voice 0 (relative-note pitches 1)))
+
+(defun chord-dur (voice pitches duration)
+  (phrase voice 0 (relative-note pitches duration)))
+
 (defun experiment ()
   (synth "music" (piece (v bass)
-		   (motive v 12)
-		   (motive v 14)
-		   (motive v 12)
-		   (motive v 0)
+;		   (motive v 12)
+;		   (motive v 14)
+;		   (motive v 19)
+;		   (motive v )
+;		   (motive v 12)
 
-		   (bass-line bass -12)
-		   (bass-line bass -10)
-		   (bass-line bass -12)
-		   (bass-line bass -12))))
+		   (wholes-chord v (major-chord 0))
+		   (wholes-chord v (minor-chord 1))
+		   (wholes-chord v (minor-chord 2))
+		   (wholes-chord v (minor-chord 1))
+		   (wholes-chord v (major-chord 0))
+
+
+		   ;; (phrase v 0 (relative-note 0 4)
+		   ;; 	   (relative-note 0 4)
+		   ;; 	   (relative-note 12 4)
+		   ;; 	   (relative-note 12 4))
+		   ;; (chord-dur v (major-chord 7) 1)
+		   ;; (chord-dur v (major-chord 0) 1)
+		   ;; (chord-dur v (major-chord 5) 1)
+
+		   ;; (chord-dur v (major-chord 7) 1)
+		   ;; (chord-dur v (major-chord 5) 1)
+		   ;; (chord-dur v (major-chord 0) 1)
+		   ;; (format t "~s~%" v)
+;;		   (bass-line bass -12)
+;;		   (bass-line bass -10)
+;;		   (bass-line bass -12)
+;;		   (bass-line bass -12))))
+		   )))
+
+(experiment)
