@@ -1,27 +1,20 @@
 (defpackage #:melisma
-  (:use #:cl #:eric))
+  (:use #:cl #:eric)
+  (:export #:*input*
+	   #:make-note
+	   #:note
+	   #:render-lilypond
+	   #:render-lilypond*
+	   #:play-lilypond))
 
 (in-package #:melisma)
 
 (defvar *base-pitch*)
 
 (defstruct note
+  voice
   duration
   pitch)
-
-(defstruct voice
-  notes)
-
-(defmacro piece ((&rest voices) &body body)
-  (let ((voice-definitions (mapcar (lambda (v) (list v '(make-voice))) voices)))
-    `(let ,voice-definitions
-       ,@body
-       (list ,@voices))))
-
-(defmacro phrase (voice base &rest notes)
-  `(let ((*base-pitch* ,base))
-     (dolist (note (list ,@notes))
-       (push note (voice-notes ,voice)))))
 
 (defun relative-note (pitch duration)
   (make-note :pitch (typecase pitch
@@ -57,24 +50,38 @@
     (format f "    ~a~%" (render-note note)))
   (format f "        }~%"))
 
-(defun write-lilypond (filename piece instrument)
-  (eric:fopen (f filename :w)
-    (format f "\\version \"2.16.0\"
-\\score {
+(defun render-lilypond (instrument key tempo &rest piece)
+  (with-output-to-string (s)
+    (format s "\\version \"2.16.0\"
+\\score {")
+    (format s "
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = 240~%" instrument "g \\major")
-    (format f "      <<~%")
-    (dolist (voice piece)
-      (render f (voice-notes voice))
-      (unless (equal voice (car (last piece)))
-	(format f "      \\\\~%")))
-    (format f "      >>~%")
-    (format f "  }
+    \\tempo 4 = ~d~%" instrument key tempo)
+    (format s "      <<~%")
+    (let ((voices (remove-duplicates (mapcar #'note-voice piece))))
+      (dolist (voice voices)
+	(render s (remove-if-not (lambda (note) (eq (note-voice note) voice)) (reverse piece)))
+	(unless (equal voice (car (last voices)))
+	  (format s "      \\\\~%"))))
+    (format s "      >>~%")
+    (format s "  }
   \\layout { }
   \\midi { }
 }~%")))
+
+(defun render-lilypond* (instrument key tempo piece)
+  (apply #'render-lilypond instrument key tempo piece))
+
+(defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
+  (with-output-to-string (output)
+    (if (zerop (sb-ext:process-exit-code
+		(sb-ext:run-program "/usr/bin/env" (list "lilypond" "-o" filename "-")
+				:input (make-string-input-stream lilypond-string)
+				:output output
+				:error output)))
+	(shell-show-errors "timidity" (file-midi filename)))))
 
 (defun shell (command &rest args)
   (let* ((output (make-string-output-stream))
@@ -96,30 +103,22 @@
 (defun file-midi (name)
   (format nil "~a.midi" name))
 
-(defun synth (basename piece)
-  (write-lilypond (file-ly basename) piece "acoustic grand")
-  (eric:fopen (f (file-ly basename))
-    (let ((s (make-string (file-length f))))
-      (read-sequence s f)
-      (format t "~a" s)))
-  (format t "Lilypond~%")
-  (if (not (zerop (shell-show-errors "lilypond" (file-ly basename))))
-      (return-from synth))
-  (format t "Timidity~%")
-  (if (not (zerop (shell-show-errors "timidity" (file-midi basename))))
-      (return-from synth)))
+;; (defun synth (basename instrument piece)
+;; ;  (write-lilypond (file-ly basename) piece instrument)
+;;   (eric:fopen (f (file-ly basename))
+;;     (let ((s (make-string (file-length f))))
+;;       (read-sequence s f)
+;;       (format t "~a" s)))
+;;   (format t "Lilypond~%")
+;;   (if (not (zerop (shell-show-errors "lilypond" (file-ly basename))))
+;;       (return-from synth))
+;;   (format t "Timidity~%")
+;;   (if (not (zerop (shell-show-errors "timidity" (file-midi basename))))
+;;       (return-from synth)))
 
+(defvar *input* nil "Set this to the list of notes in music files.")
 
 ;; Example music, rather than structure
-
-(defun motive (voice base-pitch)
-  (phrase voice base-pitch (relative-note 0 4)
-	  (relative-note 4 4); (relative-note 7 4)
-	  (relative-note (list 0 4 7) 4)
-	  (relative-note nil 4)))
-
-(defun bass-line (voice base-pitch)
-  (phrase voice base-pitch (relative-note nil 4) (relative-note 0 2) (relative-note 0 4)))
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -130,43 +129,54 @@
 (defun diminished-chord (root)
   (list root (+ root 3) (+ root 6)))
 
-(defun wholes-chord (voice pitches)
-  (phrase voice 0 (relative-note pitches 1)))
+;(defun wholes-chord (voice pitches)
+;  (phrase voice 0 (relative-note pitches 1)))
 
-(defun chord-dur (voice pitches duration)
-  (phrase voice 0 (relative-note pitches duration)))
+;(defun chord-dur (voice pitches duration)
+;  (phrase voice 0 (relative-note pitches duration)))
 
-(defun experiment ()
-  (synth "music" (piece (v bass)
-;		   (motive v 12)
-;		   (motive v 14)
-;		   (motive v 19)
-;		   (motive v )
-;		   (motive v 12)
+;; (defun experiment ()
+;;   (synth "music" "acoustic grand"
+;; 	 (piece (v bass)
+;; 	   (chord-dur v (major-chord 12) 4)
+;; 	   (chord-dur v (minor-chord 13) 4)
+;; 	   (chord-dur v (minor-chord 14) 4)
+;; 	   (chord-dur v (minor-chord 13) 4)
+;; 	   (chord-dur v (major-chord 12) 4)
 
-		   (wholes-chord v (major-chord 0))
-		   (wholes-chord v (minor-chord 1))
-		   (wholes-chord v (minor-chord 2))
-		   (wholes-chord v (minor-chord 1))
-		   (wholes-chord v (major-chord 0))
+;; 	   (wholes-chord bass 24)
+;; 	   (wholes-chord bass 24))))
+
+;(experiment)
 
 
-		   ;; (phrase v 0 (relative-note 0 4)
-		   ;; 	   (relative-note 0 4)
-		   ;; 	   (relative-note 12 4)
-		   ;; 	   (relative-note 12 4))
-		   ;; (chord-dur v (major-chord 7) 1)
-		   ;; (chord-dur v (major-chord 0) 1)
-		   ;; (chord-dur v (major-chord 5) 1)
+;; 	 (piece (v bass)
+;; ;		   (motive v 12)
+;; ;		   (motive v 14)
+;; ;		   (motive v 19)
+;; ;		   (motive v )
+;; ;		   (motive v 12)
+;; 	   (wholes-chord v (major-chord 0))
+;; 		   (wholes-chord v (minor-chord 1))
+;; 		   (wholes-chord v (minor-chord 2))
+;; 		   (wholes-chord v (minor-chord 1))
+;; 		   (wholes-chord v (major-chord 0))
 
-		   ;; (chord-dur v (major-chord 7) 1)
-		   ;; (chord-dur v (major-chord 5) 1)
-		   ;; (chord-dur v (major-chord 0) 1)
-		   ;; (format t "~s~%" v)
-;;		   (bass-line bass -12)
-;;		   (bass-line bass -10)
-;;		   (bass-line bass -12)
-;;		   (bass-line bass -12))))
-		   )))
 
-(experiment)
+;; 		   ;; (phrase v 0 (relative-note 0 4)
+;; 		   ;; 	   (relative-note 0 4)
+;; 		   ;; 	   (relative-note 12 4)
+;; 		   ;; 	   (relative-note 12 4))
+;; 		   ;; (chord-dur v (major-chord 7) 1)
+;; 		   ;; (chord-dur v (major-chord 0) 1)
+;; 		   ;; (chord-dur v (major-chord 5) 1)
+
+;; 		   ;; (chord-dur v (major-chord 7) 1)
+;; 		   ;; (chord-dur v (major-chord 5) 1)
+;; 		   ;; (chord-dur v (major-chord 0) 1)
+;; 		   ;; (format t "~s~%" v)
+;; ;;		   (bass-line bass -12)
+;; ;;		   (bass-line bass -10)
+;; ;;		   (bass-line bass -12)
+;; ;;		   (bass-line bass -12))))
+;; 		   )
