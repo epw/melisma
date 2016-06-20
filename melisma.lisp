@@ -4,7 +4,6 @@
 	   #:make-note
 	   #:note
 	   #:render-lilypond
-	   #:render-lilypond*
 	   #:play-lilypond))
 
 (in-package #:melisma)
@@ -51,28 +50,26 @@
   (format f "        }~%"))
 
 (defun render-lilypond (instrument key tempo &rest piece)
-  (with-output-to-string (s)
-    (format s "\\version \"2.16.0\"
+  (let ((piece-flattened (reverse (loop for note-or-list in piece nconc (if (listp note-or-list) note-or-list (list note-or-list))))))
+    (with-output-to-string (s)
+      (format s "\\version \"2.16.0\"
 \\score {")
-    (format s "
+      (format s "
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
     \\tempo 4 = ~d~%" instrument key tempo)
-    (format s "      <<~%")
-    (let ((voices (remove-duplicates (mapcar #'note-voice piece))))
-      (dolist (voice voices)
-	(render s (remove-if-not (lambda (note) (eq (note-voice note) voice)) (reverse piece)))
-	(unless (equal voice (car (last voices)))
-	  (format s "      \\\\~%"))))
-    (format s "      >>~%")
-    (format s "  }
+      (format s "      <<~%")
+      (let ((voices (remove-duplicates (mapcar #'note-voice piece-flattened))))
+	(dolist (voice voices)
+	  (render s (remove-if-not (lambda (note) (eq (note-voice note) voice)) piece-flattened))
+	  (unless (equal voice (car (last voices)))
+	    (format s "      \\\\~%"))))
+      (format s "      >>~%")
+      (format s "  }
   \\layout { }
   \\midi { }
-}~%")))
-
-(defun render-lilypond* (instrument key tempo piece)
-  (apply #'render-lilypond instrument key tempo piece))
+}~%"))))
 
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (with-output-to-string (output)

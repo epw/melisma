@@ -9,7 +9,34 @@
 
 (in-package #:piece)
 
-(play-lilypond (render-lilypond "acoustic grand" "c \\major" 240
-				(make-note :voice :v :duration 1 :pitch 0)))
-
-(sb-ext:quit)
+(play-lilypond
+ (render-lilypond "piano" "c \\major" 240
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :voice :b :duration 1)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :duration 2)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :voice :b :duration 1)
+		  (make-note :duration 4 :pitch 15)
+		  (make-note :duration 4 :pitch 15)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :voice :b :duration 1)
+		  (make-note :duration 2)
+		  (make-note :duration 4 :pitch 12)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :voice :b :duration 1)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :voice :b :duration 1)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :duration 4 :pitch 14)
+		  (make-note :voice :b :duration 1 :pitch 0)
+		  (make-note :duration 1 :pitch 12)
+		  (make-note :voice :b :duration 1 :pitch 0)
+		  ))
