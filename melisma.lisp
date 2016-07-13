@@ -1,38 +1,51 @@
 (defpackage #:melisma
   (:use #:cl #:eric)
   (:export #:*input*
+	   #:*default-voice*
 	   #:make-voice
 	   #:make-note
 	   #:note
+	   #:voice-catch-up
 	   #:render-lilypond
 	   #:play-lilypond))
 
 (in-package #:melisma)
 
-(defvar *base-pitch*)
-(defvar *voice*)
-
 (defstruct voice
-  (instrument "piano")
+  (instrument "acoustic grand")
   (key "c \\major")
   (time-sig "4/4")
-  (position 0)
   (notes ()))
 (defun time-sig-lower (time-sig)
   (parse-integer (subseq time-sig (1+ (position #\/ time-sig)))))
 (defun voice-time-sig-lower (voice)
   (time-sig-lower (voice-time-sig voice)))
+(defun time-sig-upper (time-sig)
+  (parse-integer (subseq time-sig 0 (position #\/ time-sig))))
+(defun voice-time-sig-upper (voice)
+  (time-sig-upper (voice-time-sig voice)))
+(defun voice-measure-beats (voice)
+  (voice-time-sig-upper voice))
+(defun voice-position (voice)
+  (apply #'+ (mapcar #'note-beats (voice-notes voice))))
+(defun beats-remaining-in-measure (voice)
+  (- (voice-measure-beats voice)
+     (mod (voice-position voice) (voice-time-sig-upper voice))))
+
+(defvar *base-pitch*)
+(defvar *default-voice* (make-voice))
 
 (defstruct note
-  (voice *voice*)
+  (voice *default-voice*)
   beats
-  pitch)
+  pitch
+  tied)
 
 (defun ensure-list (atom-or-list)
   (if (listp atom-or-list) atom-or-list
       (list atom-or-list)))
 
-(defun relative-note (pitch beats &optional (voice *voice*))
+(defun relative-note (pitch beats &optional (voice *default-voice*))
   (make-note :pitch (typecase pitch
 		      (nil nil)
 		      (list (mapcar (lambda (p) (+ p *base-pitch*)) pitch))
@@ -54,39 +67,47 @@
 (defun render-note-value (beats time-sig-lower)
   (multiple-value-bind (quotient remainder) (floor time-sig-lower beats)
     (if (zerop remainder)
-	(format nil "~d" quotient)
-
-;; Make this second part handle (6 8) and (7 8). Be smarter than subtracting 1.
-	(let ((quotient (floor time-sig-lower (1- beats)))
-	      (remainder (render-note-value 1 time-sig-lower)))
-	  (format t "Remainder: ~a, every digit char: ~a, parsed: ~d, = quotient/2: ~a~%"
-		  remainder (every #'digit-char-p remainder) (parse-integer remainder)
-		  (= (parse-integer remainder) (2/ quotient)))
-	  (if (and (every #'digit-char-p remainder)
-		   (= (parse-integer remainder) (2* quotient)))
-	      (format nil "~d." quotient)
-	      (list (format nil "~d" quotient) remainder))))))
-    
+	(list (format nil "~d" quotient))
+	(if (and (= time-sig-lower 8)
+		 (>= beats 6))
+	    (cons "2."
+		  (if (= beats 7) "8" nil))
+	    (let ((quotient (floor time-sig-lower (1- beats)))
+		  (remainder (first (render-note-value 1 time-sig-lower))))
+	      (if (and (every #'digit-char-p remainder)
+		       (= (parse-integer remainder) (2* quotient)))
+		  (list (format nil "~d." quotient))
+		  (list (format nil "~d" quotient) remainder)))))))
 
 (defun render-duration (beats voice)
-  (if (< beats (beats-remaining-in-measure voice))
-      (render-note-value beats (voice-time-sig-lower voice))
-
-		   (render-note-value (beats-remaining-in-measure voice)
-				      (voice-time-sig-lower voice))
-		   ...)))
+  (cond ((< beats (beats-remaining-in-measure voice))
+	 (render-note-value beats (voice-time-sig-lower voice)))
+	(t
+	 (loop while (> beats 0)
+	    nconc
+	      (render-note-value (min beats (beats-remaining-in-measure voice))
+				 (voice-time-sig-lower voice))
+	    do
+	      (decf beats (beats-remaining-in-measure voice))))))
       
 (defun render-note (note)
    (let ((note-value (if (and (note-pitch note) (listp (note-pitch note)))
 			 (mapcar (lambda (p)
 				   (format nil "~(~a~)~a" (render-pitch p) (octave-marks p)))
 				 (ensure-list (note-pitch note)))
-			 (list (render-pitch (note-pitch note)))))
+			 (list (format nil "~(~a~)~a" (render-pitch (note-pitch note)) (octave-marks (note-pitch note))))))
 	 (durations (render-duration (note-beats note) (note-voice note))))
      (with-output-to-string (s)
        (dolist (duration durations)
-	 (format s "~a~{~a~^ ~}~a~a" (if (> (length note-value) 1) "<" "") note-value (if (> (length note-value) 1) "<" "")
-		 duration)))))
+	 (format s "~a~{~(~a~)~^ ~}~a~a"
+		 (if (> (length note-value) 1) "<" "")
+		 note-value
+		 (if (> (length note-value) 1) ">" "")
+		 duration)
+	 (unless (eq duration (car (last durations)))
+	   (format s "~~")))
+       (when (note-tied note)
+	 (format s "~~")))))
 
 (defun render (f notes)
   (format f "        {~%")
@@ -95,24 +116,29 @@
   (format f "        }~%"))
 
 (defun render-lilypond (tempo &rest piece)
-  (let ((piece-flattened (reverse (loop for note-or-list in piece nconc (if (listp note-or-list) note-or-list (list note-or-list))))))
+  (let ((piece-flattened (reverse (loop for note-or-list in piece
+				     nconc (if (listp note-or-list)
+					       (if (eq (first note-or-list) :ctrl)
+						   (list note-or-list)
+						   note-or-list)
+					       (list note-or-list))))))
     (with-output-to-string (s)
       (format s "\\version \"2.16.0\"
-\\score {")
-      (let ((voices (remove-duplicates (mapcar #'note-voice piece-flattened))))
+\\score {
+  <<")
+      (let ((voices (remove-duplicates (mapcar (lambda (maybe-note) (if (note-p maybe-note) (note-voice maybe-note)))
+					       piece-flattened))))
 	(dolist (voice voices)
 	  (format s "
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
     \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
-	  (format s "      <<~%")
-
 	  (render s (remove-if-not (lambda (note) (eq (note-voice note) voice)) piece-flattened))
-	  (unless (equal voice (car (last voices)))
-	    (format s "      \\\\~%"))))
-      (format s "      >>~%")
-      (format s "  }
+;;	  (unless (equal voice (car (last voices)))
+;;	    (format s "      \\\\~%"))
+	  (format s "  }~%")))
+      (format s "  >>
   \\layout { }
   \\midi { }
 }~%"))))
@@ -146,18 +172,12 @@
 (defun file-midi (name)
   (format nil "~a.midi" name))
 
-;; (defun synth (basename instrument piece)
-;; ;  (write-lilypond (file-ly basename) piece instrument)
-;;   (eric:fopen (f (file-ly basename))
-;;     (let ((s (make-string (file-length f))))
-;;       (read-sequence s f)
-;;       (format t "~a" s)))
-;;   (format t "Lilypond~%")
-;;   (if (not (zerop (shell-show-errors "lilypond" (file-ly basename))))
-;;       (return-from synth))
-;;   (format t "Timidity~%")
-;;   (if (not (zerop (shell-show-errors "timidity" (file-midi basename))))
-;;       (return-from synth)))
+(defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*))
+  (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
+     with beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
+		       (voice-measure-beats voice-to-rest))
+     collect (make-note :voice voice-to-rest :beats beats
+			:pitch nil)))
 
 (defvar *input* nil "Set this to the list of notes in music files.")
 
