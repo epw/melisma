@@ -143,6 +143,34 @@
   \\midi { }
 }~%"))))
 
+(defun render-lilypond (tempo &rest piece)
+  (let ((piece-flattened (reverse (loop for note-or-list in piece
+				     nconc (if (listp note-or-list)
+					       (if (eq (first note-or-list) :ctrl)
+						   (list note-or-list)
+						   note-or-list)
+					       (list note-or-list))))))
+    (with-output-to-string (s)
+      (format s "\\version \"2.16.0\"
+\\score {
+  <<")
+      (let ((voices (remove-duplicates (mapcar (lambda (maybe-note) (if (note-p maybe-note) (note-voice maybe-note)))
+					       piece-flattened))))
+	(dolist (voice voices)
+	  (format s "
+  \\new Staff \\with {midiInstrument = #~s}
+  {
+    \\key ~(~a~)
+    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
+	  (render s (remove-if-not (lambda (note) (eq (note-voice note) voice)) piece-flattened))
+;;	  (unless (equal voice (car (last voices)))
+;;	    (format s "      \\\\~%"))
+	  (format s "  }~%")))
+      (format s "  >>
+  \\layout { }
+  \\midi { }
+}~%"))))
+
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (with-output-to-string (output)
     (if (zerop (sb-ext:process-exit-code

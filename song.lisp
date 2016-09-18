@@ -20,6 +20,7 @@
 	(bass (make-voice))
 	(*default-voice* piano))
    (render-lilypond 240
+		    
 		    ;; (make-note :beats 1 :pitch 12)
 		    ;; (make-note :beats 1 :pitch 14)
 		    ;; (make-note :beats 1 :pitch 14)
@@ -56,3 +57,15 @@
 		    '(:ctrl (voice-catch-up bass))
 		    (make-note :voice bass :beats 4 :pitch 0)
 		    )))
+
+
+
+(play-lilypond
+ (render-lilypond
+  (dotimes (_ 2)
+    (declare (ignore _))
+    (add-note :beats 1 :pitch 12)
+    (add-note :beats 1 :pitch 15)
+    (add-note :beats 1 :pitch 19)
+    (add-note :beats 1 :pitch 24)
+    (add-note :voice bass :beats 4 :pitch 0))))
