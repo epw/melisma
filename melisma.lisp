@@ -15,7 +15,8 @@
   (instrument "acoustic grand")
   (key "c \\major")
   (time-sig "4/4")
-  (timeline ()))
+  (timeline ())
+  current-position)
 (defun time-sig-lower (time-sig)
   (parse-integer (subseq time-sig (1+ (position #\/ time-sig)))))
 (defun voice-time-sig-lower (voice)
@@ -27,7 +28,7 @@
 (defun voice-measure-beats (voice)
   (voice-time-sig-upper voice))
 (defun voice-position (voice)
-  (apply #'+ (mapcar #'count-beats (voice-timeline voice))))
+  (apply #'+ (mapcar #'count-beats (subseq (voice-timeline voice) 0 (voice-current-position voice)))))
 (defun beats-remaining-in-measure (voice)
   (- (voice-measure-beats voice)
      (mod (voice-position voice) (voice-time-sig-upper voice))))
@@ -52,9 +53,9 @@
     (tuplet (tuplet-beats element))
     (t 0)))
 
-;; (defun ensure-list (atom-or-list)
-;;   (if (listp atom-or-list) atom-or-list
-;;       (list atom-or-list)))
+(defun ensure-list (atom-or-list)
+  (if (listp atom-or-list) atom-or-list
+      (list atom-or-list)))
 
 (defun relative-note (pitch beats)
   (make-note :pitch (typecase pitch
@@ -94,11 +95,15 @@
 	 (render-note-value beats (voice-time-sig-lower voice)))
 	(t
 	 (loop while (> beats 0)
+	    with original-position = (voice-current-position voice)
 	    nconc
-	      (render-note-value (min beats (beats-remaining-in-measure voice))
-				 (voice-time-sig-lower voice))
+	      (progn
+		(render-note-value (min beats (beats-remaining-in-measure voice))
+				   (voice-time-sig-lower voice)))
 	    do
-	      (decf beats (beats-remaining-in-measure voice))))))
+	      (decf beats (beats-remaining-in-measure voice))
+	      (incf (voice-current-position voice))
+	    finally (setf (voice-current-position voice) original-position)))))
 
 (defun render-note (note voice)
   (let ((note-value (if (and (note-pitch note) (listp (note-pitch note)))
@@ -148,8 +153,10 @@
 
 (defun render (f voice)
   (format f "        {~%")
+  (setf (voice-current-position voice) 0)
   (dolist (element (reverse (voice-timeline voice)))
-    (render-element f element voice))
+    (render-element f element voice)
+    (incf (voice-current-position voice)))
   (format f "        }~%"))
 
 (defun render-lilypond (tempo voices)
@@ -164,8 +171,6 @@
     \\key ~(~a~)
     \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
 	(render s voice)
-;;	  (unless (equal voice (car (last voices)))
-;;	    (format s "      \\\\~%"))
 	(format s "  }~%"))
       (format s "  >>
   \\layout { }
@@ -201,16 +206,33 @@
 (defun file-midi (name)
   (format nil "~a.midi" name))
 
-;; (defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*))
-;;   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
-;;      with beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
-;; 		       (voice-measure-beats voice-to-rest))
-;;      collect (make-note -to-rest :beats beats
-;; 			:pitch nil)))
+(defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*))
+  (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
+     for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
+		       (voice-measure-beats voice-to-rest))
+     do
+       (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest))))
 
-;; (defvar *input* nil "Set this to the list of notes in music files.")
+;; Syntactic sugar
+(defmacro make-music (tempo voices &body body)
+  (let ((just-voices (loop for voice in voices
+			collect
+			  (if (listp voice) (first voice)
+			      voice))))
+    `(play-lilypond
+      (render-lilypond ,tempo
+		       (let (,@(loop for voice in voices
+				  collect
+				    (if (listp voice) voice
+					(list voice '(make-voice)))))
+			 (let ((*default-voice* ,(first just-voices)))
+			   ,@body
+			   (list ,@just-voices)))))))
 
-;; Example music, rather than structure
+(defun n (pitch duration &optional voice tied-p)
+  (push (make-note :beats duration :pitch pitch :tied-p tied-p)
+	(voice-timeline (if voice voice *default-voice*))))
+
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -221,57 +243,7 @@
 (defun diminished-chord (root)
   (list root (+ root 3) (+ root 6)))
 
-;(defun wholes-chord (voice pitches)
-;  (phrase voice 0 (relative-note pitches 1)))
-
-;(defun chord-dur (voice pitches duration)
-;  (phrase voice 0 (relative-note pitches duration)))
-
-;; (defun experiment ()
-;;   (synth "music" "acoustic grand"
-;; 	 (piece (v bass)
-;; 	   (chord-dur v (major-chord 12) 4)
-;; 	   (chord-dur v (minor-chord 13) 4)
-;; 	   (chord-dur v (minor-chord 14) 4)
-;; 	   (chord-dur v (minor-chord 13) 4)
-;; 	   (chord-dur v (major-chord 12) 4)
-
-;; 	   (wholes-chord bass 24)
-;; 	   (wholes-chord bass 24))))
-
-;(experiment)
-
-
-;; 	 (piece (v bass)
-;; ;		   (motive v 12)
-;; ;		   (motive v 14)
-;; ;		   (motive v 19)
-;; ;		   (motive v )
-;; ;		   (motive v 12)
-;; 	   (wholes-chord v (major-chord 0))
-;; 		   (wholes-chord v (minor-chord 1))
-;; 		   (wholes-chord v (minor-chord 2))
-;; 		   (wholes-chord v (minor-chord 1))
-;; 		   (wholes-chord v (major-chord 0))
-
-
-;; 		   ;; (phrase v 0 (relative-note 0 4)
-;; 		   ;; 	   (relative-note 0 4)
-;; 		   ;; 	   (relative-note 12 4)
-;; 		   ;; 	   (relative-note 12 4))
-;; 		   ;; (chord-dur v (major-chord 7) 1)
-;; 		   ;; (chord-dur v (major-chord 0) 1)
-;; 		   ;; (chord-dur v (major-chord 5) 1)
-
-;; 		   ;; (chord-dur v (major-chord 7) 1)
-;; 		   ;; (chord-dur v (major-chord 5) 1)
-;; 		   ;; (chord-dur v (major-chord 0) 1)
-;; 		   ;; (format t "~s~%" v)
-;; ;;		   (bass-line bass -12)
-;; ;;		   (bass-line bass -10)
-;; ;;		   (bass-line bass -12)
-;; ;;		   (bass-line bass -12))))
-;; 		   )
+;; Example music, rather than structure
 
 (defun experiment ()
   (render-lilypond 120
@@ -280,9 +252,9 @@
 		     (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
 		     (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
 		     (push (make-note :beats 1 :pitch 19) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 24) (voice-timeline melody))
+		     (push (make-note :beats 6 :pitch 24) (voice-timeline melody))
 
-		     (push (make-note :beats 4 :pitch nil) (voice-timeline bass))
+		     (voice-catch-up bass melody)
 
 		     (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
 		     (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
