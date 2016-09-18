@@ -4,10 +4,9 @@
 	   #:*default-voice*
 	   #:make-voice
 	   #:make-note
-	   #:note
 	   #:voice-catch-up
-	   #:render-lilypond
-	   #:play-lilypond))
+	   #:make-music
+	   #:n))
 
 (in-package #:melisma)
 
@@ -246,23 +245,17 @@
 ;; Example music, rather than structure
 
 (defun experiment ()
-  (render-lilypond 120
-		   (let ((melody (make-voice))
-			 (bass (make-voice)))
-		     (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 19) (voice-timeline melody))
-		     (push (make-note :beats 6 :pitch 24) (voice-timeline melody))
+  (make-music 120 (melody bass)
+    (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
+    (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
+    (push (make-note :beats 1 :pitch 19) (voice-timeline melody))
+    (push (make-note :beats 2 :pitch 24) (voice-timeline melody))
 
-		     (voice-catch-up bass melody)
+    (voice-catch-up bass melody)
 
-		     (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 19) (voice-timeline melody))
-		     (push (make-note :beats 1 :pitch 24) (voice-timeline melody))
+    (n 12 1)
+    (n 16 1)
+    (n 19 1)
+    (n 24 1)
 
-		     (push (make-note :beats 4 :pitch 0) (voice-timeline bass))
-
-		     (list melody bass))))
-
-
+    (n 0 4 bass)))
