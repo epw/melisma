@@ -4,6 +4,7 @@
 	   #:*default-voice*
 	   #:make-voice
 	   #:make-note
+	   #:show-sheet-music
 	   #:voice-catch-up
 	   #:make-music
 	   #:n))
@@ -183,7 +184,7 @@
 				:input (make-string-input-stream lilypond-string)
 				:output output
 				:error output)))
-	(shell-show-errors "timidity" (file-midi filename)))))
+	(shell-show-errors "timidity" (file-ext filename :midi)))))
 
 (defun shell (command &rest args)
   (let* ((output (make-string-output-stream))
@@ -199,11 +200,11 @@
 	(format t "~a" output))
     return-code))
 
-(defun file-ly (name)
-  (format nil "~a.ly" name))
+(defun file-ext (name ext)
+  (format nil "~a.~(~a~)" name ext))
 
-(defun file-midi (name)
-  (format nil "~a.midi" name))
+(defun show-sheet-music (&optional (filename "/tmp/melisma"))
+  (shell-show-errors "evince" (file-ext filename :pdf)))
 
 (defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*))
   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
@@ -231,7 +232,6 @@
 (defun n (pitch duration &optional voice tied-p)
   (push (make-note :beats duration :pitch pitch :tied-p tied-p)
 	(voice-timeline (if voice voice *default-voice*))))
-
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
