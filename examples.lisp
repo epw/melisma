@@ -4,11 +4,11 @@
   (unless (find-package :melisma)
     (load (compile-file "/home/eric/projects/melisma/melisma.lisp"))))
 
-(defpackage #:song
+(defpackage #:examples
   (:use #:cl #:melisma)
   (:export #:main))
 
-(in-package #:song)
+(in-package #:examples)
 
 (defun up ()
   (dolist (note (major-chord 0))

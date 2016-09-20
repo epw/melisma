@@ -2,12 +2,25 @@
   (:use #:cl #:eric)
   (:export #:*input*
 	   #:*default-voice*
+	   #:*base-pitch*
 	   #:make-voice
 	   #:make-note
 	   #:show-sheet-music
 	   #:voice-catch-up
 	   #:make-music
-	   #:n))
+	   #:n
+	   #:/A
+	   #:/B
+	   #:/C
+	   #:/D
+	   #:/E
+	   #:/F
+	   #:/G
+	   #:major-chord
+	   #:minor-chord
+	   #:augmented-chord
+	   #:diminished-chord
+	   #:repeat))
 
 (in-package #:melisma)
 
@@ -33,7 +46,7 @@
   (- (voice-measure-beats voice)
      (mod (voice-position voice) (voice-time-sig-upper voice))))
 
-(defvar *base-pitch*)
+(defvar *base-pitch* nil)
 (defvar *default-voice* (make-voice))
 
 (defstruct note
@@ -56,13 +69,6 @@
 (defun ensure-list (atom-or-list)
   (if (listp atom-or-list) atom-or-list
       (list atom-or-list)))
-
-(defun relative-note (pitch beats)
-  (make-note :pitch (typecase pitch
-		      (nil nil)
-		      (list (mapcar (lambda (p) (+ p *base-pitch*)) pitch))
-		      (t (+ pitch *base-pitch*)))
-	     :beats beats))
 
 (defun octave-marks (pitch)
   (if pitch
@@ -206,12 +212,14 @@
 (defun show-sheet-music (&optional (filename "/tmp/melisma"))
   (shell-show-errors "evince" (file-ext filename :pdf)))
 
-(defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*))
+(defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*) fill-fn)
   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
      for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
 		       (voice-measure-beats voice-to-rest))
      do
-       (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest))))
+       (if fill-fn
+	   (funcall fill-fn voice-to-rest voice-at-point beats)
+	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
 ;; Syntactic sugar
 (defmacro make-music (tempo voices &body body)
@@ -229,9 +237,35 @@
 			   ,@body
 			   (list ,@just-voices)))))))
 
-(defun n (pitch duration &optional voice tied-p)
-  (push (make-note :beats duration :pitch pitch :tied-p tied-p)
-	(voice-timeline (if voice voice *default-voice*))))
+(defmacro play (&body body)
+  "Most simple macro for trying things out."
+  `(make-music 120 (melody)
+     ,@body))
+
+(defun base-pitch-for-voice (base-pitch voice)
+  (typecase base-pitch
+    (list
+     (getf base-pitch voice 0))
+    (t base-pitch)))
+
+(defun get-relative-pitches (pitch voice)
+  (if *base-pitch*
+      (typecase pitch
+	(list (mapcar (lambda (p) (get-relative-pitches p voice)) pitch))
+	(t (+ (base-pitch-for-voice *base-pitch* voice) pitch)))
+      pitch))
+
+(defun n (pitch duration &optional (voice *default-voice*) tied-p)
+  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p)
+	(voice-timeline voice)))
+
+(defvar /C 0)
+(defvar /D 2)
+(defvar /E 4)
+(defvar /F 5)
+(defvar /G 7)
+(defvar /A 9)
+(defvar /B 11)
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -241,6 +275,9 @@
   (list root (+ root 4) (+ root 8)))
 (defun diminished-chord (root)
   (list root (+ root 3) (+ root 6)))
+
+(defmacro repeat ((&optional (times 2)) &body body)
+  (cons 'progn (loop for i from 1 to times append body)))
 
 ;; Example music, rather than structure
 
