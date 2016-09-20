@@ -6,6 +6,8 @@
 	   #:make-voice
 	   #:make-note
 	   #:show-sheet-music
+	   #:base-pitch-for-voice
+	   #:copy-base-pitch
 	   #:voice-catch-up
 	   #:make-music
 	   #:n
@@ -46,7 +48,6 @@
   (- (voice-measure-beats voice)
      (mod (voice-position voice) (voice-time-sig-upper voice))))
 
-(defvar *base-pitch* nil)
 (defvar *default-voice* (make-voice))
 
 (defstruct note
@@ -212,6 +213,27 @@
 (defun show-sheet-music (&optional (filename "/tmp/melisma"))
   (shell-show-errors "evince" (file-ext filename :pdf)))
 
+(defvar *base-pitch* nil)
+
+(defun base-pitch-for-voice (voice &optional (base-pitch *base-pitch*))
+  (typecase base-pitch
+    (list
+     (getf base-pitch voice 0))
+    (t base-pitch)))
+
+(defun (setf base-pitch-for-voice) (voice new-value &optional (base-pitch *base-pitch*))
+  (setf (getf base-pitch voice) new-value))
+
+(defun copy-base-pitch (&rest voice-pitch-pairs)
+  (typecase *base-pitch*
+    (list
+     (let ((base-pitch (copy-list *base-pitch*)))
+       (loop for voice-pitch-pair on voice-pitch-pairs by #'cddr
+	  do
+	    (setf (getf base-pitch (first voice-pitch-pair)) (second voice-pitch-pair)))
+       base-pitch))
+    (t *base-pitch*)))
+
 (defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*) fill-fn)
   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
      for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
@@ -242,17 +264,11 @@
   `(make-music 120 (melody)
      ,@body))
 
-(defun base-pitch-for-voice (base-pitch voice)
-  (typecase base-pitch
-    (list
-     (getf base-pitch voice 0))
-    (t base-pitch)))
-
 (defun get-relative-pitches (pitch voice)
   (if *base-pitch*
       (typecase pitch
 	(list (mapcar (lambda (p) (get-relative-pitches p voice)) pitch))
-	(t (+ (base-pitch-for-voice *base-pitch* voice) pitch)))
+	(t (+ (base-pitch-for-voice voice *base-pitch*) pitch)))
       pitch))
 
 (defun n (pitch duration &optional (voice *default-voice*) tied-p)

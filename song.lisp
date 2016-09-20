@@ -10,31 +10,33 @@
 
 (in-package #:song)
 
-(defun up ()
-  (dolist (note (major-chord 0))
-    (n note 1/4))
-  (n nil 1/4))
-
-(defun up-fill (voice-to-fill voice-at-point beats)
-  (declare (ignore voice-at-point beats))
-  (dolist (note (major-chord 0))
-    (n note 1/4 voice-to-fill))
-  (n nil 1/4 voice-to-fill))
-
-(defun bass-up (bass)
-  (dolist (note (major-chord 0))
-    (n note 2 bass)))
+(defun x (num)
+  (list num
+	   (case num
+	     (0 4)
+	     (4 7)
+	     (7 12))))
 
 (defun main ()
   (make-music 120 ((melody (make-voice :instrument "acoustic grand"))
 		   bass)
-    (let ((*base-pitch* (list melody (+ /C 12))))
-      (up)
-      (voice-catch-up bass)
-;;      (repeat (6) (up))
-      (bass-up bass)
-      (voice-catch-up melody bass #'up-fill)
-      (n 12 2 bass)
+    (let ((*base-pitch* (list melody /C)))
+      (n (x 0) 2)
+      (n (x 4) 2)
+      (n (x 7) 2)
+      (n (x 4) 2)
+      (n (x 7) 2)
+
+      (let ((*base-pitch* (copy-base-pitch melody 12)))
+	(n 0 1)
+	(n 4 1)
+	(n 7 1)
+	(n 12 1))
+
+      (n (x 7) 2)
+      (n (x 4) 2)
+      (n 4 2)
+      (n 0 4)
       )))
 
 (main)
