@@ -10,7 +10,9 @@
 	   #:copy-base-pitch
 	   #:voice-catch-up
 	   #:make-music
+	   #:music-beats
 	   #:n
+	   #:r
 	   #:/A
 	   #:/B
 	   #:/C
@@ -161,17 +163,18 @@
 (defun render (f voice)
   (format f "        {~%")
   (setf (voice-current-position voice) 0)
-  (dolist (element (reverse (voice-timeline voice)))
+  (dolist (element (voice-timeline voice))
     (render-element f element voice)
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
 (defun render-lilypond (tempo voices)
-    (with-output-to-string (s)
+  (with-output-to-string (s)
       (format s "\\version \"2.16.0\"
 \\score {
   <<")
       (dolist (voice voices)
+	(setf (voice-timeline voice) (nreverse (voice-timeline voice)))
 	(format s "
   \\new Staff \\with {midiInstrument = #~s}
   {
@@ -244,12 +247,12 @@
 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
 ;; Syntactic sugar
-(defmacro make-music (tempo voices &body body)
+(defmacro arrange-music (action tempo voices &body body)
   (let ((just-voices (loop for voice in voices
 			collect
 			  (if (listp voice) (first voice)
 			      voice))))
-    `(play-lilypond
+    `(,action
       (render-lilypond ,tempo
 		       (let (,@(loop for voice in voices
 				  collect
@@ -258,6 +261,17 @@
 			 (let ((*default-voice* ,(first just-voices)))
 			   ,@body
 			   (list ,@just-voices)))))))
+
+(defmacro make-music (tempo voices &body body)
+  `(arrange-music play-lilypond ,tempo ,voices ,@body))
+
+(defmacro music-beats (&body body)
+  "Given a body of music that pushes onto *default-voice*, return the number of beats used."
+  `(let ((melody (make-voice)))
+     (arrange-music (lambda (_)
+		      (declare (ignore _))
+		      (voice-position melody))
+	 120 ((*default-voice* melody)) ,@body)))
 
 (defmacro play (&body body)
   "Most simple macro for trying things out."
@@ -274,6 +288,9 @@
 (defun n (pitch duration &optional (voice *default-voice*) tied-p)
   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p)
 	(voice-timeline voice)))
+
+(defun r (duration &optional (voice *default-voice*) tied-p)
+    (n nil duration voice tied-p))
 
 (defvar /C 0)
 (defvar /D 2)

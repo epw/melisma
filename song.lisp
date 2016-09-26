@@ -10,33 +10,11 @@
 
 (in-package #:song)
 
-(defun x (num)
-  (list num
-	   (case num
-	     (0 4)
-	     (4 7)
-	     (7 12))))
-
 (defun main ()
-  (make-music 120 ((melody (make-voice :instrument "acoustic grand"))
+  (make-music 200 ((melody (make-voice :instrument "violin"))
 		   bass)
-    (let ((*base-pitch* (list melody /C)))
-      (n (x 0) 2)
-      (n (x 4) 2)
-      (n (x 7) 2)
-      (n (x 4) 2)
-      (n (x 7) 2)
-
-      (let ((*base-pitch* (copy-base-pitch melody 12)))
-	(n 0 1)
-	(n 4 1)
-	(n 7 1)
-	(n 12 1))
-
-      (n (x 7) 2)
-      (n (x 4) 2)
-      (n 4 2)
-      (n 0 4)
+    (let ((*base-pitch* (list melody (+ /C 24))))
+      (n (major-chord 0) 4)
       )))
 
 (main)
