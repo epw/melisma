@@ -12,6 +12,7 @@
 	   #:make-music
 	   #:music-beats
 	   #:n
+	   #:s
 	   #:r
 	   #:/A
 	   #:/B
@@ -20,6 +21,8 @@
 	   #:/E
 	   #:/F
 	   #:/G
+	   #:major-degree
+	   #:minor-degree
 	   #:major-chord
 	   #:minor-chord
 	   #:augmented-chord
@@ -55,7 +58,8 @@
 (defstruct note
   beats
   pitch
-  tied-p)
+  tied-p
+  articulation)
 
 (defstruct tuplet
   "Multiple notes taking up a different number of beats, spaced evenly. Most commonly triplet."
@@ -131,7 +135,9 @@
 	(unless (eq duration (car (last durations)))
 	  (format s "~~")))
       (when (note-tied-p note)
-	(format s "~~")))))
+	(format s "~~"))
+      (when (note-articulation note)
+	(format s "\\~(~a~)" (note-articulation note))))))
 
 (defun render-pitch-of-size (pitch size)
   (let ((note-value (if (and pitch (listp pitch))
@@ -168,11 +174,15 @@
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
-(defun render-lilypond (tempo voices)
+(defun render-lilypond (tempo voices &optional (articulate-p t))
   (with-output-to-string (s)
       (format s "\\version \"2.16.0\"
+~a
+
 \\score {
-  <<")
+~a
+  <<" (if articulate-p "\\include \"articulate.ly\"" "")
+  (if articulate-p "\\unfoldRepeats \\articulate" ""))
       (dolist (voice voices)
 	(setf (voice-timeline voice) (nreverse (voice-timeline voice)))
 	(format s "
@@ -278,6 +288,10 @@
   `(make-music 120 (melody)
      ,@body))
 
+(defmacro show (&body body)
+  "Simple macro to see Lilypond output."
+  `(arrange-music (lambda (s) (format t "~a" s)) 120 (melody) ,@body))
+
 (defun get-relative-pitches (pitch voice)
   (if *base-pitch*
       (typecase pitch
@@ -285,8 +299,12 @@
 	(t (+ (base-pitch-for-voice voice *base-pitch*) pitch)))
       pitch))
 
-(defun n (pitch duration &optional (voice *default-voice*) tied-p)
-  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p)
+(defun n (pitch duration &optional (voice *default-voice*) tied-p articulation)
+  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p :articulation articulation)
+	(voice-timeline voice)))
+
+(defun s (pitch duration &optional (voice *default-voice*))
+  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :articulation "staccato")
 	(voice-timeline voice)))
 
 (defun r (duration &optional (voice *default-voice*) tied-p)
@@ -299,6 +317,34 @@
 (defvar /G 7)
 (defvar /A 9)
 (defvar /B 11)
+
+(defun major-degree (n)
+  (ecase n
+    (1 0)
+    (2 2)
+    (3 4)
+    (4 5)
+    (5 7)
+    (6 9)
+    (7 11)
+    (8 12)))
+
+(defun minor-degree (n)
+  (ecase n
+    (1 0)
+    (2 2)
+    (3 3)
+    (4 5)
+    (5 7)
+    (6 8)
+    (7 10)
+    (8 12)))
+
+(defmacro octave ((count) &body body)
+  `(let ((*base-pitch* ,(typecase count
+				  (list count)
+				  (t (* count 12)))))
+     ,@body))
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))

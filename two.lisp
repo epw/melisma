@@ -14,14 +14,9 @@
   (make-music 180 ((piano (make-voice :instrument "acoustic grand"))
 		   (violin (make-voice :instrument "violin"))
 		   bass)
-    (let ((*base-pitch* (list piano (+ /C 12))))
-      (repeat ()
-	(repeat () (n '(0 4) 1))
-	(repeat () (n -5 1)))
-      (repeat ()
-	(repeat () (n '(4 7) 1))
-	(repeat () (n -5 1)))
-
+    (let ((*base-pitch* (list piano (+ /C 0))))
+      (n (major-chord /C) 1)
+;;      (n '(0 12) 1)
       )))
 
 (main)
