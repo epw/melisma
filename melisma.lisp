@@ -10,6 +10,7 @@
 	   #:copy-base-pitch
 	   #:voice-catch-up
 	   #:make-music
+	   #:do-music
 	   #:music-beats
 	   #:n
 	   #:s
@@ -174,7 +175,10 @@
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
+(defvar *last-lilypond*)
+
 (defun render-lilypond (tempo voices &optional (articulate-p t))
+  (setf *last-lilypond* (list tempo voices))
   (with-output-to-string (s)
       (format s "\\version \"2.16.0\"
 ~a
@@ -191,20 +195,30 @@
     \\key ~(~a~)
     \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
 	(render s voice)
-	(format s "  }~%"))
+	(format s "  }~%")
+	(setf (voice-timeline voice) (nreverse (voice-timeline voice))))
       (format s "  >>
   \\layout { }
   \\midi { }
 }~%")))
 
-(defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
+(defun consume-lilypond (lilypond-string command extension &optional (filename "/tmp/melisma"))
   (with-output-to-string (output)
     (if (zerop (sb-ext:process-exit-code
 		(sb-ext:run-program "/usr/bin/env" (list "lilypond" "-o" filename "-")
 				:input (make-string-input-stream lilypond-string)
 				:output output
 				:error output)))
-	(shell-show-errors "timidity" (file-ext filename :midi)))))
+	(shell-show-errors command (if extension (file-ext filename extension) filename)))))
+
+(defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
+  (consume-lilypond lilypond-string "timidity" :midi filename))
+
+(defun print-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
+  (consume-lilypond lilypond-string "cat" nil filename))
+
+(defun show-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
+  (consume-lilypond lilypond-string "evince" :pdf filename))
 
 (defun shell (command &rest args)
   (let* ((output (make-string-output-stream))
@@ -223,8 +237,13 @@
 (defun file-ext (name ext)
   (format nil "~a.~(~a~)" name ext))
 
-(defun show-sheet-music (&optional (filename "/tmp/melisma"))
-  (shell-show-errors "evince" (file-ext filename :pdf)))
+(defun show-sheet-music (&key clean-run-p (filename "/tmp/melisma"))
+  (if clean-run-p
+      (show-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*) nil))
+      (shell-show-errors "evince" (file-ext filename :pdf))))
+
+(defun replay ()
+  (play-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*))))
 
 (defvar *base-pitch* nil)
 
@@ -274,6 +293,9 @@
 
 (defmacro make-music (tempo voices &body body)
   `(arrange-music play-lilypond ,tempo ,voices ,@body))
+
+(defmacro do-music (tempo voices &body body)
+  `(arrange-music (lambda (s) (format t "~a~%" s)) ,tempo ,voices ,@body))
 
 (defmacro music-beats (&body body)
   "Given a body of music that pushes onto *default-voice*, return the number of beats used."

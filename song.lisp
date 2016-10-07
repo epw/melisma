@@ -19,7 +19,7 @@
     (n (major-degree 1) 1)))
 
 (defun main ()
-  (make-music 130 ((melody (make-voice :instrument "acoustic grand"))
+  (make-music 130 ((melody (make-voice :instrument "violin"))
 		   bass)
     (let ((*base-pitch* (list melody (+ /C 12))))
       (theme /C)
