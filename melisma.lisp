@@ -28,6 +28,8 @@
 	   #:minor-chord
 	   #:augmented-chord
 	   #:diminished-chord
+	   #:diatonic-pitch
+	   #:diatonic-chord
 	   #:repeat))
 
 (in-package #:melisma)
@@ -36,6 +38,7 @@
   (instrument "acoustic grand")
   (key "c \\major")
   (time-sig "4/4")
+  clef
   (timeline ())
   current-position)
 (defun time-sig-lower (time-sig)
@@ -175,6 +178,19 @@
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
+(defun render-voice (stream voice tempo)
+  (setf (voice-timeline voice) (nreverse (voice-timeline voice)))
+  (format stream "
+  \\new Staff \\with {midiInstrument = #~s}
+  {
+    \\key ~(~a~)
+    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
+  (when (voice-clef voice)
+    (format stream "    \\clef ~(~a~)~%" (voice-clef voice)))
+  (render stream voice)
+  (format stream "  }~%")
+  (setf (voice-timeline voice) (nreverse (voice-timeline voice))))
+
 (defvar *last-lilypond*)
 
 (defun render-lilypond (tempo voices &optional (articulate-p t))
@@ -188,15 +204,7 @@
   <<" (if articulate-p "\\include \"articulate.ly\"" "")
   (if articulate-p "\\unfoldRepeats \\articulate" ""))
       (dolist (voice voices)
-	(setf (voice-timeline voice) (nreverse (voice-timeline voice)))
-	(format s "
-  \\new Staff \\with {midiInstrument = #~s}
-  {
-    \\key ~(~a~)
-    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
-	(render s voice)
-	(format s "  }~%")
-	(setf (voice-timeline voice) (nreverse (voice-timeline voice))))
+	(render-voice s voice tempo))
       (format s "  >>
   \\layout { }
   \\midi { }
@@ -213,9 +221,6 @@
 
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "timidity" :midi filename))
-
-(defun print-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
-  (consume-lilypond lilypond-string "cat" nil filename))
 
 (defun show-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "evince" :pdf filename))
@@ -245,7 +250,7 @@
 (defun replay ()
   (play-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*))))
 
-(defvar *base-pitch* nil)
+(defvar *base-pitch* 0)
 
 (defun base-pitch-for-voice (voice &optional (base-pitch *base-pitch*))
   (typecase base-pitch
@@ -305,9 +310,9 @@
 		      (voice-position melody))
 	 120 ((*default-voice* melody)) ,@body)))
 
-(defmacro play (&body body)
+(defmacro play ((&optional (instrument "acoustic grand")) &body body)
   "Most simple macro for trying things out."
-  `(make-music 120 (melody)
+  `(make-music 120 ((melody (make-voice :instrument ,instrument)))
      ,@body))
 
 (defmacro show (&body body)
@@ -362,11 +367,8 @@
     (7 10)
     (8 12)))
 
-(defmacro octave ((count) &body body)
-  `(let ((*base-pitch* ,(typecase count
-				  (list count)
-				  (t (* count 12)))))
-     ,@body))
+(defun octave (pitch &optional (shift 1))
+  (+ pitch (* shift 12)))
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -376,6 +378,24 @@
   (list root (+ root 4) (+ root 8)))
 (defun diminished-chord (root)
   (list root (+ root 3) (+ root 6)))
+
+(defun diatonic-pitch (root degree)
+  (+ root (funcall (case degree
+		     ((1 4 5) #'major-degree)
+		     (t #'minor-degree))
+		   degree)))
+
+;; We need some kind of way to easily add to some or all of a list, so
+;; make this shorter:
+;; (let ((chord (diatonic-chord 1)))
+;;   (list (second chord) (+ (first chord) 12) (+ (third chord) 12)))
+
+(defun diatonic-chord (degree &optional (key *base-pitch*))
+  (funcall (case degree
+	     ((1 4 5) #'major-chord)
+	     (7 #'diminished-chord)
+	     (t #'minor-chord))
+	   (+ (major-degree degree) key)))
 
 (defmacro repeat ((&optional (times 2)) &body body)
   (cons 'progn (loop for i from 1 to times append body)))
