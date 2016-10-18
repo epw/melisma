@@ -15,6 +15,7 @@
 	   #:n
 	   #:s
 	   #:r
+	   #:triplet
 	   #:/A
 	   #:/B
 	   #:/C
@@ -166,9 +167,12 @@
   (format stream "    ~a~%" (render-note element voice)))
 
 (defmethod render-element (stream (element tuplet) voice)
-  (format stream "    \tuplet ~a/~a ~{~a ~}~%" (length (tuplet-notes element)) (tuplet-beats element)
-	  ;; Note: '4' is definitely wrong here, need to calculate the correct "shape" of the note.
-	  (mapcar (lambda (tuplet-note) (render-pitch-of-size tuplet-note 4)) (tuplet-notes element))))
+  (format stream "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
+	  (mapcar (lambda (tuplet-note)
+		    (render-pitch-of-size tuplet-note
+					  (floor (voice-time-sig-lower voice)
+						 (2/ (tuplet-beats element)))))
+		  (tuplet-notes element))))
 
 (defun render (f voice)
   (format f "        {~%")
@@ -242,8 +246,8 @@
 (defun file-ext (name ext)
   (format nil "~a.~(~a~)" name ext))
 
-(defun show-sheet-music (&key clean-run-p (filename "/tmp/melisma"))
-  (if clean-run-p
+(defun show-sheet-music (&key clean-run-p c (filename "/tmp/melisma"))
+  (if (or clean-run-p c)
       (show-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*) nil))
       (shell-show-errors "evince" (file-ext filename :pdf))))
 
@@ -313,7 +317,8 @@
 (defmacro play ((&optional (instrument "acoustic grand")) &body body)
   "Most simple macro for trying things out."
   `(make-music 120 ((melody (make-voice :instrument ,instrument)))
-     ,@body))
+     (let ((*default-voice* melody))
+       ,@body)))
 
 (defmacro show (&body body)
   "Simple macro to see Lilypond output."
@@ -336,6 +341,12 @@
 
 (defun r (duration &optional (voice *default-voice*) tied-p)
     (n nil duration voice tied-p))
+
+;; (play () (tuplet 1 /C /E /G))
+
+(defun triplet (note1 note2 note3 duration &optional (voice *default-voice*))
+  (push (make-tuplet :notes (list note1 note2 note3) :beats duration)
+	(voice-timeline voice)))
 
 (defvar /C 0)
 (defvar /D 2)
