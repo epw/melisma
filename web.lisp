@@ -9,11 +9,12 @@
 
 (defun main ()
   (in-package #:melisma-web)
-  (eval
-   (read-from-string
-    (with-output-to-string (s)
-      (loop for line = (read-line *standard-input* nil nil)
-	 while line
-	 do (format s "~a~%" line))))))
+  (handler-case (eval
+		(read-from-string
+		 (with-output-to-string (s)
+		   (loop for line = (read-line *standard-input* nil nil)
+		      while line
+		      do (format s "~a~%" line)))))
+	       (t (e) (describe e *error-output*))))
 
 (sb-ext:save-lisp-and-die "melisma2ly" :toplevel #'main :executable t)

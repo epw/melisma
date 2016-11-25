@@ -11,6 +11,7 @@
 	   #:voice-catch-up
 	   #:make-music
 	   #:do-music
+	   #:produce-mp3
 	   #:music-beats
 	   #:n
 	   #:s
@@ -23,14 +24,24 @@
 	   #:/E
 	   #:/F
 	   #:/G
+	   #:@A
+	   #:@B
+	   #:@C
+	   #:@D
+	   #:@E
+	   #:@F
+	   #:@G
 	   #:major-degree
 	   #:minor-degree
+	   #:typed-degree
 	   #:major-chord
 	   #:minor-chord
 	   #:augmented-chord
 	   #:diminished-chord
 	   #:diatonic-pitch
 	   #:diatonic-chord
+	   #:typed-chord
+	   #:octave
 	   #:repeat))
 
 (in-package #:melisma)
@@ -197,7 +208,9 @@
 
 (defvar *last-lilypond*)
 
-(defun render-lilypond (tempo voices &optional (articulate-p t))
+(defvar *articulate-p* t)
+
+(defun render-lilypond (tempo voices &optional (articulate-p *articulate-p*))
   (setf *last-lilypond* (list tempo voices))
   (with-output-to-string (s)
       (format s "\\version \"2.16.0\"
@@ -214,14 +227,14 @@
   \\midi { }
 }~%")))
 
-(defun consume-lilypond (lilypond-string command extension &optional (filename "/tmp/melisma"))
+(defun consume-lilypond (lilypond-string command extension &optional (filename "/tmp/melisma") (other-args ()))
   (with-output-to-string (output)
     (if (zerop (sb-ext:process-exit-code
 		(sb-ext:run-program "/usr/bin/env" (list "lilypond" "-o" filename "-")
 				:input (make-string-input-stream lilypond-string)
 				:output output
 				:error output)))
-	(shell-show-errors command (if extension (file-ext filename extension) filename)))))
+	(apply #'shell-show-errors command (if extension (file-ext filename extension) filename) other-args))))
 
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "timidity" :midi filename))
@@ -284,7 +297,6 @@
 	   (funcall fill-fn voice-to-rest voice-at-point beats)
 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
-;; Syntactic sugar
 (defmacro arrange-music (action tempo voices &body body)
   (let ((just-voices (loop for voice in voices
 			collect
@@ -331,6 +343,18 @@
 	(t (+ (base-pitch-for-voice voice *base-pitch*) pitch)))
       pitch))
 
+(defvar *mp3-file* "/home/eric/www/melisma-output.mp3")
+(defmacro produce-mp3 (tempo voices &body body)
+  (let ((lilypond-string (gensym)))
+    `(let ((,lilypond-string (arrange-music identity ,tempo ,voices ,@body)))
+       (format t "~a~%" (consume-lilypond ,lilypond-string "timidity" :midi "/tmp/produce-mp3" (list "-o" *mp3-file* "-Ov")))
+       (let* ((*articulate-p* nil)
+	      (,lilypond-string (arrange-music identity ,tempo ,voices ,@body)))
+	 (consume-lilypond ,lilypond-string "ls" :pdf "/tmp/produce-mp3-clean")
+	 (format t "Copy: ~a~%" (shell-show-errors "/bin/cp" "/tmp/produce-mp3-clean.pdf" "/home/eric/www/melisma-output.pdf"))))))
+
+;; Syntactic sugar
+
 (defun n (pitch duration &optional (voice *default-voice*) tied-p articulation)
   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p :articulation articulation)
 	(voice-timeline voice)))
@@ -356,6 +380,15 @@
 (defvar /A 9)
 (defvar /B 11)
 
+(defvar @C 1)
+(defvar @D 2)
+(defvar @E 3)
+(defvar @F 4)
+(defvar @G 5)
+(defvar @A 6)
+(defvar @B 7)
+
+
 (defun major-degree (n)
   (ecase n
     (1 0)
@@ -377,6 +410,11 @@
     (6 8)
     (7 10)
     (8 12)))
+
+(defun typed-degree (major-or-minor n)
+  (ecase major-or-minor
+    (:major (major-degree n))
+    (:minor (minor-degree n))))
 
 (defun octave (pitch &optional (shift 1))
   (+ pitch (* shift 12)))
@@ -407,6 +445,13 @@
 	     (7 #'diminished-chord)
 	     (t #'minor-chord))
 	   (+ (major-degree degree) key)))
+
+(defun typed-chord (type root)
+  (ecase type
+    (:major (major-chord root))
+    (:minor (minor-chord root))
+    (:augmented (augmented-chord root))
+    (:diminished (diminished-chord root))))
 
 (defmacro repeat ((&optional (times 2)) &body body)
   (cons 'progn (loop for i from 1 to times append body)))
