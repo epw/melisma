@@ -23,7 +23,8 @@
   (produce-mp3 120 (melody)
     (phrase t)
     (phrase nil (octave /A -1))
-    (phrase t /G)))
+    (phrase t /G)
+    (phrase t)))
 
 (main)
 
