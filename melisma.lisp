@@ -42,7 +42,8 @@
 	   #:diatonic-chord
 	   #:typed-chord
 	   #:octave
-	   #:repeat))
+	   #:repeat
+	   #:%repeat-index))
 
 (in-package #:melisma)
 
@@ -369,7 +370,7 @@
 ;; (play () (tuplet 1 /C /E /G))
 
 (defun triplet (note1 note2 note3 duration &optional (voice *default-voice*))
-  (push (make-tuplet :notes (list note1 note2 note3) :beats duration)
+  (push (make-tuplet :notes (mapcar (lambda (n) (get-relative-pitches n voice)) (list note1 note2 note3)) :beats duration)
 	(voice-timeline voice)))
 
 (defvar /C 0)
@@ -454,7 +455,8 @@
     (:diminished (diminished-chord root))))
 
 (defmacro repeat ((&optional (times 2)) &body body)
-  (cons 'progn (loop for i from 1 to times append body)))
+  (append '(let ((%repeat-index 0)))
+	  (loop for i from 1 to times append (append body '((incf %repeat-index))))))
 
 ;; Example music, rather than structure
 

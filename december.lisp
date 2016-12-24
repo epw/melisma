@@ -4,11 +4,11 @@
   (unless (find-package :melisma)
     (load (compile-file "/home/eric/projects/melisma/melisma.lisp"))))
 
-(defpackage #:thanksgiving
+(defpackage #:december
   (:use #:cl #:melisma)
   (:export #:main))
 
-(in-package #:thanksgiving)
+(in-package #:december)
 
 (defun phrase (major-p &optional (key /C))
   (let ((major-or-minor (if major-p :major :minor))
@@ -20,11 +20,24 @@
     (n (octave (typed-degree major-or-minor @C)) 2)))
 
 (defun main ()
-  (make-music 120 (melody)
-    (phrase t)
-    (phrase nil (octave /A -1))
-    (phrase t /G)
-    (phrase t)))
-
+  (make-music 140 (melody bass)
+    (let ((*base-pitch* (list melody (octave /C))))
+      (repeat ()
+	(n /E 1)
+	(repeat (3)
+	  (n /C 1/2)
+	  (n /E 1))
+	(n /C 1/2)
+	(repeat (3)
+	  (n /E 1/2)
+	  (n /C 1/2)
+	  (n /C 1/2))
+	(n /E 2)
+	(ecase %repeat-index
+	  (0 (voice-catch-up bass melody))
+	  (1 (n /C 3 bass)
+	     (n /E 3 bass))))
+      )))
+    
 (main)
 
