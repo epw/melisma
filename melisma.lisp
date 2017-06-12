@@ -303,7 +303,7 @@
 			collect
 			  (if (listp voice) (first voice)
 			      voice))))
-    `(,action
+    `(funcall ,action
       (render-lilypond ,tempo
 		       (let (,@(loop for voice in voices
 				  collect
@@ -314,7 +314,7 @@
 			   (list ,@just-voices)))))))
 
 (defmacro make-music (tempo voices &body body)
-  `(arrange-music play-lilypond ,tempo ,voices ,@body))
+  `(arrange-music #'play-lilypond ,tempo ,voices ,@body))
 
 (defmacro do-music (tempo voices &body body)
   `(arrange-music (lambda (s) (format t "~a~%" s)) ,tempo ,voices ,@body))
@@ -347,10 +347,10 @@
 (defvar *mp3-file* "/home/eric/www/melisma-output.mp3")
 (defmacro produce-mp3 (tempo voices &body body)
   (let ((lilypond-string (gensym)))
-    `(let ((,lilypond-string (arrange-music identity ,tempo ,voices ,@body)))
+    `(let ((,lilypond-string (arrange-music #'identity ,tempo ,voices ,@body)))
        (format t "~a~%" (consume-lilypond ,lilypond-string "timidity" :midi "/tmp/produce-mp3" (list "-o" *mp3-file* "-Ov")))
        (let* ((*articulate-p* nil)
-	      (,lilypond-string (arrange-music identity ,tempo ,voices ,@body)))
+	      (,lilypond-string (arrange-music #'identity ,tempo ,voices ,@body)))
 	 (consume-lilypond ,lilypond-string "ls" :pdf "/tmp/produce-mp3-clean")
 	 (format t "Copy: ~a~%" (shell-show-errors "/bin/cp" "/tmp/produce-mp3-clean.pdf" "/home/eric/www/melisma-output.pdf"))))))
 
