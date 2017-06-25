@@ -101,9 +101,10 @@
       ""))
 
 (defun render-pitch (pitch)
-  (if pitch
-      (nth (mod pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b))
-      'r))
+  (typecase pitch
+    (string pitch)
+    (integer (nth (mod pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b)))
+    (null 'r)))
 
 (defun render-note-value (beats time-sig-lower)
   (multiple-value-bind (quotient remainder) (floor time-sig-lower beats)
@@ -196,11 +197,16 @@
 
 (defun render-voice (stream voice tempo)
   (setf (voice-timeline voice) (nreverse (voice-timeline voice)))
-  (format stream "
+  (if (string= (voice-instrument voice) "drums")
+      (format stream "
+  \\drums
+  {
+    \\tempo 4 = ~d~%" tempo)
+      (format stream "
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo)
+    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo))
   (when (voice-clef voice)
     (format stream "    \\clef ~(~a~)~%" (voice-clef voice)))
   (render stream voice)
@@ -340,6 +346,7 @@
 (defun get-relative-pitches (pitch voice)
   (if *base-pitch*
       (typecase pitch
+	(string nil)
 	(list (mapcar (lambda (p) (get-relative-pitches p voice)) pitch))
 	(t (+ (base-pitch-for-voice voice *base-pitch*) pitch)))
       pitch))

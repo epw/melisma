@@ -1,0 +1,26 @@
+
+I'm reworking a piece of my music-composing program and ran into
+something, which I was wondering if any of you have experience with.
+
+Are there any best practices for making a two-way "hierarchy of
+representation"? I know how to write an abstraction, a DSL or just a
+structure, that will be translated to another representation, which
+itself might be translated again, and so on.
+
+But, I want to make it easy to go in the other direction. So I could
+write on the "middle" representation and either have it translate
+normally, into something a program will consume, or translate "up",
+into something a human could have written to produce it in the first
+place.
+
+I want this because it would let me have the very customized way of
+expressing music that gets translated into Lilypond, but I also want
+to be able to input sheet music into the program.
+
+What I'm imagining is a data structure that is pretty obvious to
+convert to Lilypond (which means that transcriptions, substitutions,
+and such are hard like with normal music), but the structure could be
+converted to and from another one, that operates with more abstract
+music, like I'm doing now.
+
+So, does this sound reasonable? Any thoughts or advice on approaches?

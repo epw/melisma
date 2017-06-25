@@ -33,4 +33,4 @@
 (defun main ()
   (moonlight #'melisma::play-lilypond))
 
-(main)
+;(main)
