@@ -1,7 +1,6 @@
 (defpackage #:melisma
   (:use #:cl #:eric)
   (:export #:*input*
-	   #:*default-voice*
 	   #:*base-pitch*
 	   #:make-voice
 	   #:make-note
@@ -42,6 +41,9 @@
 	   #:diatonic-chord
 	   #:typed-chord
 	   #:octave
+	   #:octaves
+	   #:flat
+	   #:sharp
 	   #:repeat
 	   #:%repeat-index))
 
@@ -49,6 +51,7 @@
 
 (defstruct voice
   (instrument "acoustic grand")
+  (offset-note 0)
   (key "c \\major")
   (time-sig "4/4")
   clef
@@ -70,11 +73,15 @@
   (- (voice-measure-beats voice)
      (mod (voice-position voice) (voice-time-sig-upper voice))))
 
-(defvar *default-voice* (make-voice))
+(defun make-drums (&key (time-sig "4/4"))
+  (make-voice :instrument "drums" :time-sig time-sig))
+
+(defvar *octave-offset* 0)
 
 (defstruct note
   beats
   pitch
+  (offset 0)
   tied-p
   articulation)
 
@@ -100,11 +107,15 @@
 	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))
       ""))
 
-(defun render-pitch (pitch)
+(defun render-pitch (pitch &optional (offset 0))
   (typecase pitch
     (string pitch)
-    (integer (nth (mod pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b)))
-    (null 'r)))
+    (integer
+     (let ((actual-pitch (+ pitch offset)))
+       (format nil "~(~a~)~a"
+	       (nth (mod actual-pitch 12) (list 'c 'cis 'd 'dis 'e 'f 'fis 'g 'gis 'a 'ais 'b))
+	       (octave-marks actual-pitch))))
+    (null "r")))
 
 (defun render-note-value (beats time-sig-lower)
   (multiple-value-bind (quotient remainder) (floor time-sig-lower beats)
@@ -136,12 +147,13 @@
 	      (incf (voice-current-position voice))
 	    finally (setf (voice-current-position voice) original-position)))))
 
+(defun note-value (pitch offset)
+  (if (and pitch (listp pitch))
+      (mapcar (lambda (p) (render-pitch p offset)) (ensure-list pitch))
+      (list (render-pitch pitch offset))))
+
 (defun render-note (note voice)
-  (let ((note-value (if (and (note-pitch note) (listp (note-pitch note)))
-			(mapcar (lambda (p)
-				  (format nil "~(~a~)~a" (render-pitch p) (octave-marks p)))
-				(ensure-list (note-pitch note)))
-			(list (format nil "~(~a~)~a" (render-pitch (note-pitch note)) (octave-marks (note-pitch note))))))
+  (let ((note-value (note-value (note-pitch note) (note-offset note)))
 	(durations (render-duration (note-beats note) voice)))
     (with-output-to-string (s)
       (dolist (duration durations)
@@ -157,12 +169,8 @@
       (when (note-articulation note)
 	(format s "\\~(~a~)" (note-articulation note))))))
 
-(defun render-pitch-of-size (pitch size)
-  (let ((note-value (if (and pitch (listp pitch))
-			(mapcar (lambda (p)
-				  (format nil "~(~a~)~a" (render-pitch p) (octave-marks p)))
-				(ensure-list pitch))
-			(list (format nil "~(~a~)~a" (render-pitch pitch) (octave-marks pitch))))))
+(defun render-pitch-of-size (pitch voice size)
+  (let ((note-value (note-value pitch voice)))
     (with-output-to-string (s)
       (format s "~a~{~(~a~)~^ ~}~a~a"
 	      (if (> (length note-value) 1) "<" "")
@@ -170,28 +178,21 @@
 	      (if (> (length note-value) 1) ">" "")
 	      size))))
 
-(defgeneric render-element (stream element voice))
-
-(defmethod render-element (stream element voice)
-  (declare (ignorable stream element voice))
-  nil)
-
-(defmethod render-element (stream (element note) voice)
-  (format stream "    ~a~%" (render-note element voice)))
-
-(defmethod render-element (stream (element tuplet) voice)
-  (format stream "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
-	  (mapcar (lambda (tuplet-note)
-		    (render-pitch-of-size tuplet-note
-					  (floor (voice-time-sig-lower voice)
-						 (2/ (tuplet-beats element)))))
-		  (tuplet-notes element))))
-
 (defun render (f voice)
   (format f "        {~%")
   (setf (voice-current-position voice) 0)
   (dolist (element (voice-timeline voice))
-    (render-element f element voice)
+    (etypecase element
+      (note (format f "    ~a~%" (render-note element voice)))
+      (tuplet
+       (format f "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
+	       (mapcar (lambda (tuplet-note)
+			 (render-pitch-of-size tuplet-note
+					       voice
+					       (floor (voice-time-sig-lower voice)
+						      (2/ (tuplet-beats element)))))
+		       (tuplet-notes element)))))
+					;    (render-element f element voice)
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
@@ -295,29 +296,31 @@
        base-pitch))
     (t *base-pitch*)))
 
-(defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*) fill-fn)
-  (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
-     for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
-		       (voice-measure-beats voice-to-rest))
-     do
-       (if fill-fn
-	   (funcall fill-fn voice-to-rest voice-at-point beats)
-	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
+;; (defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*) fill-fn)
+;;   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
+;;      for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
+;; 		       (voice-measure-beats voice-to-rest))
+;;      do
+;;        (if fill-fn
+;; 	   (funcall fill-fn voice-to-rest voice-at-point beats)
+;; 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
-(defmacro arrange-music (action tempo voices &body body)
-  (let ((just-voices (loop for voice in voices
-			collect
-			  (if (listp voice) (first voice)
-			      voice))))
-    `(funcall ,action
-      (render-lilypond ,tempo
-		       (let (,@(loop for voice in voices
+(defmacro arrange-music (tempo voices &body body)
+  `(render-lilypond ,tempo
+		    (let ((voices (list
+				   ,@(loop for voice in voices
+					collect
+					  (if (listp voice) (list 'cons (list 'quote (car voice)) (cadr voice))
+					      (list 'cons (list 'quote voice) '(make-voice)))))))
+		      (flet (,@(loop for voice in voices
+				  for voice-name = (if (listp voice) (first voice) voice)
 				  collect
-				    (if (listp voice) voice
-					(list voice '(make-voice)))))
-			 (let ((*default-voice* ,(first just-voices)))
-			   ,@body
-			   (list ,@just-voices)))))))
+				    `(,voice-name (pitch &optional (duration 1) &rest attrs)
+						  (declare (ignore attrs))
+						  (push (make-note :beats duration :pitch pitch :offset *octave-offset*)
+							(voice-timeline (cdr (assoc ',voice-name voices)))))))
+			,@body
+			(mapcar #'cdr voices)))))
 
 (defmacro make-music (tempo voices &body body)
   `(arrange-music #'play-lilypond ,tempo ,voices ,@body))
@@ -325,19 +328,19 @@
 (defmacro do-music (tempo voices &body body)
   `(arrange-music (lambda (s) (format t "~a~%" s)) ,tempo ,voices ,@body))
 
-(defmacro music-beats (&body body)
-  "Given a body of music that pushes onto *default-voice*, return the number of beats used."
-  `(let ((melody (make-voice)))
-     (arrange-music (lambda (_)
-		      (declare (ignore _))
-		      (voice-position melody))
-	 120 ((*default-voice* melody)) ,@body)))
+;; (defmacro music-beats (&body body)
+;;   "Given a body of music that pushes onto *default-voice*, return the number of beats used."
+;;   `(let ((melody (make-voice)))
+;;      (arrange-music (lambda (_)
+;; 		      (declare (ignore _))
+;; 		      (voice-position melody))
+;; 	 120 ((*default-voice* melody)) ,@body)))
 
-(defmacro play ((&optional (instrument "acoustic grand")) &body body)
-  "Most simple macro for trying things out."
-  `(make-music 120 ((melody (make-voice :instrument ,instrument)))
-     (let ((*default-voice* melody))
-       ,@body)))
+;; (defmacro play ((&optional (instrument "acoustic grand")) &body body)
+;;   "Most simple macro for trying things out."
+;;   `(make-music 120 ((melody (make-voice :instrument ,instrument)))
+;;      (let ((*default-voice* melody))
+;;        ,@body)))
 
 (defmacro show (&body body)
   "Simple macro to see Lilypond output."
@@ -363,39 +366,42 @@
 
 ;; Syntactic sugar
 
-(defun n (pitch duration &optional (voice *default-voice*) tied-p articulation)
-  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p :articulation articulation)
-	(voice-timeline voice)))
+;; (defun n (pitch duration &optional (voice *default-voice*) tied-p articulation)
+;;   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p :articulation articulation)
+;; 	(voice-timeline voice)))
 
-(defun s (pitch duration &optional (voice *default-voice*))
-  (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :articulation "staccato")
-	(voice-timeline voice)))
+;; (defun s (pitch duration &optional (voice *default-voice*))
+;;   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :articulation "staccato")
+;; 	(voice-timeline voice)))
 
-(defun r (duration &optional (voice *default-voice*) tied-p)
-    (n nil duration voice tied-p))
+;; (defun r (duration &optional (voice *default-voice*) tied-p)
+;;     (n nil duration voice tied-p))
 
 ;; (play () (tuplet 1 /C /E /G))
 
-(defun triplet (note1 note2 note3 duration &optional (voice *default-voice*))
-  (push (make-tuplet :notes (mapcar (lambda (n) (get-relative-pitches n voice)) (list note1 note2 note3)) :beats duration)
-	(voice-timeline voice)))
+;; (defun triplet (note1 note2 note3 duration &optional (voice *default-voice*))
+;;   (push (make-tuplet :notes (mapcar (lambda (n) (get-relative-pitches n voice)) (list note1 note2 note3)) :beats duration)
+;; 	(voice-timeline voice)))
 
-(defvar /C 0)
-(defvar /D 2)
-(defvar /E 4)
-(defvar /F 5)
-(defvar /G 7)
-(defvar /A 9)
-(defvar /B 11)
+(defconstant /C 0)
+(defconstant /D 2)
+(defconstant /E 4)
+(defconstant /F 5)
+(defconstant /G 7)
+(defconstant /A 9)
+(defconstant /B 11)
 
-(defvar @C 1)
-(defvar @D 2)
-(defvar @E 3)
-(defvar @F 4)
-(defvar @G 5)
-(defvar @A 6)
-(defvar @B 7)
+(defconstant @C 1)
+(defconstant @D 2)
+(defconstant @E 3)
+(defconstant @F 4)
+(defconstant @G 5)
+(defconstant @A 6)
+(defconstant @B 7)
 
+(alexandria:define-constant +drum-snare+ "sn" :test 'equal)
+(alexandria:define-constant +drum-bass+ "bd" :test 'equal)
+(alexandria:define-constant +drum-cym+ "crashcymbal" :test 'equal)
 
 (defun major-degree (n)
   (ecase n
@@ -424,8 +430,18 @@
     (:major (major-degree n))
     (:minor (minor-degree n))))
 
-(defun octave (pitch &optional (shift 1))
-  (+ pitch (* shift 12)))
+(defmacro octave (shift &body body)
+  `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
+    ,@body))
+
+(defun octaves (count pitch)
+  (+ pitch (* count 12)))
+
+(defun sharp (pitch)
+  (+ pitch 1))
+
+(defun flat (pitch)
+  (- pitch 1))
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -466,19 +482,3 @@
 	  (loop for i from 1 to times append (append body '((incf %repeat-index))))))
 
 ;; Example music, rather than structure
-
-(defun experiment ()
-  (make-music 120 (melody bass)
-    (push (make-note :beats 1 :pitch 12) (voice-timeline melody))
-    (push (make-note :beats 1 :pitch 16) (voice-timeline melody))
-    (push (make-note :beats 1 :pitch 19) (voice-timeline melody))
-    (push (make-note :beats 2 :pitch 24) (voice-timeline melody))
-
-    (voice-catch-up bass melody)
-
-    (n 12 1)
-    (n 16 1)
-    (n 19 1)
-    (n 24 1)
-
-    (n 0 4 bass)))
