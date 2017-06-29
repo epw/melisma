@@ -1,17 +1,19 @@
 (defpackage #:melisma
   (:use #:cl #:eric)
   (:export #:*input*
-	   #:*base-pitch*
 	   #:make-voice
 	   #:make-note
 	   #:show-sheet-music
-	   #:base-pitch-for-voice
-	   #:copy-base-pitch
 	   #:voice-catch-up
+	   #:arrange-music
+	   #:play-lilypond
 	   #:make-music
 	   #:do-music
 	   #:produce-mp3
 	   #:music-beats
+	   #:voice-offset-set
+	   #:voice-offset-inc
+	   #:voice-catch-up
 	   #:n
 	   #:s
 	   #:r
@@ -30,6 +32,20 @@
 	   #:@E
 	   #:@F
 	   #:@G
+	   #:a-first
+	   #:a-second
+	   #:a-third
+	   #:a-fourth
+	   #:a-fifth
+	   #:a-sixth
+	   #:a-seventh
+	   #:i-first
+	   #:i-second
+	   #:i-third
+	   #:i-fourth
+	   #:i-fifth
+	   #:i-sixth
+	   #:i-seventh
 	   #:major-degree
 	   #:minor-degree
 	   #:typed-degree
@@ -169,8 +185,8 @@
       (when (note-articulation note)
 	(format s "\\~(~a~)" (note-articulation note))))))
 
-(defun render-pitch-of-size (pitch voice size)
-  (let ((note-value (note-value pitch voice)))
+(defun render-pitch-of-size (pitch size)
+  (let ((note-value (note-value pitch 0)))
     (with-output-to-string (s)
       (format s "~a~{~(~a~)~^ ~}~a~a"
 	      (if (> (length note-value) 1) "<" "")
@@ -188,7 +204,6 @@
        (format f "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
 	       (mapcar (lambda (tuplet-note)
 			 (render-pitch-of-size tuplet-note
-					       voice
 					       (floor (voice-time-sig-lower voice)
 						      (2/ (tuplet-beats element)))))
 		       (tuplet-notes element)))))
@@ -216,6 +231,7 @@
 
 (defvar *last-lilypond*)
 
+; Controls "articulation", which makes fancier note attributes like trills work in MIDI, but makes the output ugly
 (defvar *articulate-p* t)
 
 (defun render-lilypond (tempo voices &optional (articulate-p *articulate-p*))
@@ -267,66 +283,82 @@
 (defun file-ext (name ext)
   (format nil "~a.~(~a~)" name ext))
 
-(defun show-sheet-music (&key clean-run-p c (filename "/tmp/melisma"))
-  (if (or clean-run-p c)
+(defun show-sheet-music (&key (clean-run-p t) (c t) (filename "/tmp/melisma"))
+  (if (and clean-run-p c)
       (show-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*) nil))
       (shell-show-errors "evince" (file-ext filename :pdf))))
 
 (defun replay ()
   (play-lilypond (render-lilypond (first *last-lilypond*) (second *last-lilypond*))))
 
-(defvar *base-pitch* 0)
+(defmacro voice-offset-set ((voice shift) &body body)
+  (let ((shift-amount (gensym))
+	(original (gensym)))
+    `(let ((,shift-amount ,shift)
+	   (,original (voice-offset-note ,voice)))
+       (setf (voice-offset-note ,voice) ,shift-amount)
+       ,@body
+       (setf (voice-offset-note ,voice) ,original))))
 
-(defun base-pitch-for-voice (voice &optional (base-pitch *base-pitch*))
-  (typecase base-pitch
-    (list
-     (getf base-pitch voice 0))
-    (t base-pitch)))
+(defmacro voice-offset-inc ((voice shift) &body body)
+  `(voice-offset-set (,voice (+ (voice-offset-note ,voice) ,shift)) ,@body))
 
-(defun (setf base-pitch-for-voice) (voice new-value &optional (base-pitch *base-pitch*))
-  (setf (getf base-pitch voice) new-value))
+(defun voice-catch-up (voice-to-rest voice-at-point &optional fill-fn)
+  (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
+     for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
+		       (voice-measure-beats voice-to-rest))
+     do
+       (if fill-fn
+	   (funcall fill-fn voice-to-rest voice-at-point beats)
+	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
-(defun copy-base-pitch (&rest voice-pitch-pairs)
-  (typecase *base-pitch*
-    (list
-     (let ((base-pitch (copy-list *base-pitch*)))
-       (loop for voice-pitch-pair on voice-pitch-pairs by #'cddr
-	  do
-	    (setf (getf base-pitch (first voice-pitch-pair)) (second voice-pitch-pair)))
-       base-pitch))
-    (t *base-pitch*)))
+(defun calc-pitch (pitch voice)
+  (+ pitch *octave-offset* (voice-offset-note voice)))
 
-;; (defun voice-catch-up (voice-to-rest &optional (voice-at-point *default-voice*) fill-fn)
-;;   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
-;;      for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
-;; 		       (voice-measure-beats voice-to-rest))
-;;      do
-;;        (if fill-fn
-;; 	   (funcall fill-fn voice-to-rest voice-at-point beats)
-;; 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
+(defun n (voice pitch &optional (duration 1) tied-p articulation)
+  (push (make-note :beats duration
+		   :pitch (typecase pitch
+			    (number (calc-pitch pitch voice))
+			    (list (mapcar (lambda (p) (calc-pitch p voice)) pitch)))
+		   :tied-p tied-p :articulation articulation)
+	(voice-timeline voice)))
+
+(defun s (voice pitch &optional (duration 1))
+  (n voice pitch duration nil "staccato"))
+
+(defun r (voice &optional (duration 1))
+  (n voice nil duration))
+
+(defun triplet (voice pitch1 pitch2 pitch3 &optional (duration 1))
+  (push (make-tuplet :notes (mapcar (lambda (pitch) (calc-pitch pitch voice))
+				    (list pitch1 pitch2 pitch3)) :beats duration)
+	(voice-timeline voice)))
 
 (defmacro arrange-music (tempo voices &body body)
+  "This macro implements the main Melisma DSL."
   `(render-lilypond ,tempo
-		    (let ((voices (list
-				   ,@(loop for voice in voices
-					collect
-					  (if (listp voice) (list 'cons (list 'quote (car voice)) (cadr voice))
-					      (list 'cons (list 'quote voice) '(make-voice)))))))
-		      (flet (,@(loop for voice in voices
-				  for voice-name = (if (listp voice) (first voice) voice)
-				  collect
-				    `(,voice-name (pitch &optional (duration 1) &rest attrs)
-						  (declare (ignore attrs))
-						  (push (make-note :beats duration :pitch pitch :offset *octave-offset*)
-							(voice-timeline (cdr (assoc ',voice-name voices)))))))
-			,@body
-			(mapcar #'cdr voices)))))
+		    (let* ((voices (list
+				    ,@(loop for voice in voices
+					 collect
+					   (if (listp voice) (list 'cons (list 'quote (car voice)) (cadr voice))
+					       (list 'cons (list 'quote voice)
+						     (if (eq voice 'drums)
+							 '(make-drums)
+							 '(make-voice)))))))
+			   ,@(loop for voice in voices
+				for voice-name = (if (listp voice) (first voice) voice)
+				collect
+				  `(,voice-name (cdr (assoc ',voice-name voices)))))
+		      ,@body
+		      (mapcar #'cdr voices))))
 
-(defmacro make-music (tempo voices &body body)
-  `(arrange-music #'play-lilypond ,tempo ,voices ,@body))
+;; Following two should be unnecessary, not yet deleted just in case
 
-(defmacro do-music (tempo voices &body body)
-  `(arrange-music (lambda (s) (format t "~a~%" s)) ,tempo ,voices ,@body))
+;; (defmacro make-music (tempo voices &body body)
+;;   `(arrange-music #'play-lilypond ,tempo ,voices ,@body))
+
+;; (defmacro do-music (tempo voices &body body)
+;;   `(arrange-music (lambda (s) (format t "~a~%" s)) ,tempo ,voices ,@body))
 
 ;; (defmacro music-beats (&body body)
 ;;   "Given a body of music that pushes onto *default-voice*, return the number of beats used."
@@ -336,23 +368,12 @@
 ;; 		      (voice-position melody))
 ;; 	 120 ((*default-voice* melody)) ,@body)))
 
-;; (defmacro play ((&optional (instrument "acoustic grand")) &body body)
-;;   "Most simple macro for trying things out."
-;;   `(make-music 120 ((melody (make-voice :instrument ,instrument)))
-;;      (let ((*default-voice* melody))
-;;        ,@body)))
+(defmacro play ((&rest voices) &body body)
+  `(play-lilypond (arrange-music 120 ,voices ,@body)))
 
-(defmacro show (&body body)
-  "Simple macro to see Lilypond output."
-  `(arrange-music (lambda (s) (format t "~a" s)) 120 (melody) ,@body))
-
-(defun get-relative-pitches (pitch voice)
-  (if *base-pitch*
-      (typecase pitch
-	(string nil)
-	(list (mapcar (lambda (p) (get-relative-pitches p voice)) pitch))
-	(t (+ (base-pitch-for-voice voice *base-pitch*) pitch)))
-      pitch))
+(defmacro show ((&rest voices) &body body)
+  `(let ((*articulate-p* nil))
+     (show-lilypond (arrange-music 120 ,voices ,@body))))
 
 (defvar *mp3-file* "/home/eric/www/melisma-output.mp3")
 (defmacro produce-mp3 (tempo voices &body body)
@@ -363,25 +384,6 @@
 	      (,lilypond-string (arrange-music #'identity ,tempo ,voices ,@body)))
 	 (consume-lilypond ,lilypond-string "ls" :pdf "/tmp/produce-mp3-clean")
 	 (format t "Copy: ~a~%" (shell-show-errors "/bin/cp" "/tmp/produce-mp3-clean.pdf" "/home/eric/www/melisma-output.pdf"))))))
-
-;; Syntactic sugar
-
-;; (defun n (pitch duration &optional (voice *default-voice*) tied-p articulation)
-;;   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :tied-p tied-p :articulation articulation)
-;; 	(voice-timeline voice)))
-
-;; (defun s (pitch duration &optional (voice *default-voice*))
-;;   (push (make-note :beats duration :pitch (get-relative-pitches pitch voice) :articulation "staccato")
-;; 	(voice-timeline voice)))
-
-;; (defun r (duration &optional (voice *default-voice*) tied-p)
-;;     (n nil duration voice tied-p))
-
-;; (play () (tuplet 1 /C /E /G))
-
-;; (defun triplet (note1 note2 note3 duration &optional (voice *default-voice*))
-;;   (push (make-tuplet :notes (mapcar (lambda (n) (get-relative-pitches n voice)) (list note1 note2 note3)) :beats duration)
-;; 	(voice-timeline voice)))
 
 (defconstant /C 0)
 (defconstant /D 2)
@@ -403,38 +405,76 @@
 (alexandria:define-constant +drum-bass+ "bd" :test 'equal)
 (alexandria:define-constant +drum-cym+ "crashcymbal" :test 'equal)
 
+(defconstant +major-degrees+
+  '((1 . 0)
+    (2 . 2)
+    (3 . 4)
+    (4 . 5)
+    (5 . 7)
+    (6 . 9)
+    (7 . 11)
+    (8 . 12)))
+
 (defun major-degree (n)
-  (ecase n
-    (1 0)
-    (2 2)
-    (3 4)
-    (4 5)
-    (5 7)
-    (6 9)
-    (7 11)
-    (8 12)))
+  (cdr (assoc n +major-degrees+)))
+
+(defconstant a-first (major-degree 1))
+(defconstant a-second (major-degree 2))
+(defconstant a-third (major-degree 3))
+(defconstant a-fourth (major-degree 4))
+(defconstant a-fifth (major-degree 5))
+(defconstant a-sixth (major-degree 6))
+(defconstant a-seventh (major-degree 7))
+
+(defconstant +minor-degrees+
+  '((1 . 0)
+    (2 . 2)
+    (3 . 3)
+    (4 . 5)
+    (5 . 7)
+    (6 . 8)
+    (7 . 10)
+    (8 . 12)))
 
 (defun minor-degree (n)
-  (ecase n
-    (1 0)
-    (2 2)
-    (3 3)
-    (4 5)
-    (5 7)
-    (6 8)
-    (7 10)
-    (8 12)))
+  (cdr (assoc n +minor-degrees+)))
+
+(defconstant i-first (minor-degree 1))
+(defconstant i-second (minor-degree 2))
+(defconstant i-third (minor-degree 3))
+(defconstant i-fourth (minor-degree 4))
+(defconstant i-fifth (minor-degree 5))
+(defconstant i-sixth (minor-degree 6))
+(defconstant i-seventh (minor-degree 7))
 
 (defun typed-degree (major-or-minor n)
   (ecase major-or-minor
     (:major (major-degree n))
     (:minor (minor-degree n))))
 
+(defun degree-from-pitch (raw-pitch major-or-minor)
+  (let* ((pitch (mod raw-pitch 12))
+	 (degree (car (rassoc pitch (ecase major-or-minor
+				      (:major +major-degrees+)
+				      (:minor +minor-degrees+))))))
+    (if degree degree
+	(values (car (rassoc (1- pitch) (ecase major-or-minor
+					  (:major +major-degrees+)
+					  (:minor +minor-degrees+))))
+		:sharp))))
+
+(defmacro voice-offset-degree ((voice degree-shift &optional (major-or-minor :major)) &body body)
+  `(voice-offset-set (,voice (+ (typed-degree ,major-or-minor
+					      (+ ,degree-shift
+						 (degree-from-pitch (voice-offset-note ,voice) ,major-or-minor)))
+				(* 12 (floor (voice-offset-note ,voice) 12))))
+     ,@body))
+
 (defmacro octave (shift &body body)
   `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
     ,@body))
 
-(defun octaves (count pitch)
+(defun octaves (count &optional (pitch 0))
   (+ pitch (* count 12)))
 
 (defun sharp (pitch)
@@ -476,9 +516,5 @@
     (:minor (minor-chord root))
     (:augmented (augmented-chord root))
     (:diminished (diminished-chord root))))
-
-(defmacro repeat ((&optional (times 2)) &body body)
-  (append '(let ((%repeat-index 0)))
-	  (loop for i from 1 to times append (append body '((incf %repeat-index))))))
 
 ;; Example music, rather than structure
