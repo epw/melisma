@@ -229,7 +229,8 @@
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = ~d~%~a" (voice-instrument voice) (voice-key voice) tempo (render-voice-attrs voice)))
+    \\time ~a
+    \\tempo 4 = ~d~%~a" (voice-instrument voice) (voice-key voice) (voice-time-sig voice) tempo (render-voice-attrs voice)))
   (when (voice-clef voice)
     (format stream "    \\clef ~(~a~)~%" (voice-clef voice)))
   (render stream voice)

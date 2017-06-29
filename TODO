@@ -1,0 +1,3 @@
+Make /C and the like be absolute (ignore offsets, except maybe octave
+amount?) and aware of key signature. Maybe /C could be '(:absolute 0)
+for example.
