@@ -49,6 +49,7 @@
 	   #:major-degree
 	   #:minor-degree
 	   #:typed-degree
+	   #:voice-offset-degree
 	   #:major-chord
 	   #:minor-chord
 	   #:augmented-chord
@@ -71,6 +72,7 @@
   (key "c \\major")
   (time-sig "4/4")
   clef
+  middle-c
   (timeline ())
   current-position)
 (defun time-sig-lower (time-sig)
@@ -211,6 +213,11 @@
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
+(defun render-voice-attrs (voice)
+  (with-output-to-string (s)
+    (when (voice-middle-c voice)
+      (format s "    \\set Staff.middleCPosition = #~d~%" (voice-middle-c voice)))))
+
 (defun render-voice (stream voice tempo)
   (setf (voice-timeline voice) (nreverse (voice-timeline voice)))
   (if (string= (voice-instrument voice) "drums")
@@ -222,7 +229,7 @@
   \\new Staff \\with {midiInstrument = #~s}
   {
     \\key ~(~a~)
-    \\tempo 4 = ~d~%" (voice-instrument voice) (voice-key voice) tempo))
+    \\tempo 4 = ~d~%~a" (voice-instrument voice) (voice-key voice) tempo (render-voice-attrs voice)))
   (when (voice-clef voice)
     (format stream "    \\clef ~(~a~)~%" (voice-clef voice)))
   (render stream voice)

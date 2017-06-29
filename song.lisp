@@ -69,10 +69,6 @@
 
       (speedy melody)))
 
-(defun mini-song ()
-  (arrange-music 130 ((melody (make-voice :instrument "acoustic grand" :offset-note (octaves 1 /C))))
-      (theme melody a-seventh)))
-
 (defun main ()
   (play-lilypond (song)))
 

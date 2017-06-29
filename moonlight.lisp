@@ -10,27 +10,46 @@
 
 (in-package #:moonlight)
 
-(defun moonlight (action)
-  (melisma::arrange-music action 60
-      ((melody (make-voice :key "e \\major" :time-sig "4/4"))
-       (bass (make-voice :key "e \\major" :clef "bass" :time-sig "4/4")))
-    (repeat (8) (triplet (- (1+ /G) 12) (- (1+ /C) 0) /E 1))
-    (n (list (- (1+ /C) 24) (- (1+ /C) 12)) 4 bass)
-    (n (list (- /B 24) (- /B 12)) 4 bass)
+(defun moonlight ()
+  (arrange-music 60 ((melody (make-voice :key "e \\major" :time-sig "4/4" :middle-c 1))
+		     (bass (make-voice :key "e \\major" :clef "bass" :time-sig "4/4")))
+    (dotimes (i 8) (triplet melody
+			    (sharp (octaves -1 /G))
+			    (sharp /C)
+			    /E))
+    (n bass (list (sharp (octaves -1 /C)) (sharp /C)) 4)
+    (n bass (list (octaves -2 /B) (octaves -1 /B)) 4)
 
-    (repeat (2) (triplet (- /A 12) (- (1+ /C) 0) /E 1))
-    (repeat (2) (triplet (- /A 12) (- /D 0) (1+ /F) 1))
-    (n (list (- /A 24) (- /A 12)) 2 bass)
-    (n (list (- (1+ /F) 24) (- (1+ /F) 12)) 2 bass)
+    (dotimes (i 2) (triplet melody
+			    (octaves -1 /A)
+			    (sharp /C)
+			    /E))
+    (dotimes (i 2) (triplet melody
+			    (octaves -1 /A)
+			    /D
+			    (sharp /F)))
+    (n bass (list (octaves -2 /A) (octaves -1 /A)) 2)
+    (n bass (list (sharp (octaves -2 /F)) (sharp (octaves -1 /F))) 2)
 
-    (triplet (- (1+ /G) 12) (- (1+ /C) 0) (1+ /F) 1)
-    (triplet (- (1+ /G) 12) (- (1+ /C) 0) /E 1)
-    (triplet (- (1+ /G) 12) (- (1+ /C) 0) (1+ /D) 1)
-    (triplet (- (1+ /F) 12) (- /B 12) (1+ /D) 1)
-    (repeat (2) (n (list (- (1+ /G) 24) (- (1+ /G) 12)) 2 bass))))
-    
+    (triplet melody
+	     (sharp (octaves -1 /G))
+	     /C
+	     (sharp /F))
+    (triplet melody
+	     (sharp (octaves -1 /G))
+	     (sharp /C)
+	     /E)
+    (triplet melody
+	     (sharp (octaves -1 /G))
+	     (sharp /C)
+	     (sharp /D))
+    (triplet melody
+	     (sharp (octaves -1 /F))
+	     (octaves -1 /B)
+	     (sharp /D))
+    (dotimes (i 2) (n bass (list (sharp (octaves -2 /G)) (sharp (octaves -1 /G))) 2))))
 
 (defun main ()
-  (moonlight #'melisma::play-lilypond))
+  (play-lilypond (moonlight)))
 
-;(main)
+(main)
