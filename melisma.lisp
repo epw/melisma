@@ -465,19 +465,36 @@
 (alexandria:define-constant +drum-bass+ "bd" :test 'equal)
 (alexandria:define-constant +drum-cym+ "crashcymbal" :test 'equal)
 
-(alexandria:define-constant +major-degrees+
-  '((1 . 0)
-    (2 . 2)
-    (3 . 4)
-    (4 . 5)
-    (5 . 7)
-    (6 . 9)
-    (7 . 11)
-    (8 . 12))
-  :test 'equal)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (alexandria:define-constant +major-degrees+
+      '((1 . 0)
+	(2 . 2)
+	(3 . 4)
+	(4 . 5)
+	(5 . 7)
+	(6 . 9)
+	(7 . 11)
+	(8 . 12))
+    :test 'equal)
 
-(defun major-degree (n)
-  (cdr (assoc n +major-degrees+)))
+  (defun major-degree (n)
+    (cdr (assoc n +major-degrees+)))
+
+  (alexandria:define-constant +minor-degrees+
+      '((1 . 0)
+	(2 . 2)
+	(3 . 3)
+	(4 . 5)
+	(5 . 7)
+	(6 . 8)
+	(7 . 10)
+	(8 . 12))
+    :test 'equal)
+
+  (defun minor-degree (n)
+    (cdr (assoc n +minor-degrees+))))
+
+;; Would be nice to expand these to the rest of the modes
 
 (defconstant a-first (major-degree 1))
 (defconstant a-second (major-degree 2))
@@ -486,20 +503,6 @@
 (defconstant a-fifth (major-degree 5))
 (defconstant a-sixth (major-degree 6))
 (defconstant a-seventh (major-degree 7))
-
-(alexandria:define-constant +minor-degrees+
-  '((1 . 0)
-    (2 . 2)
-    (3 . 3)
-    (4 . 5)
-    (5 . 7)
-    (6 . 8)
-    (7 . 10)
-    (8 . 12))
-  :test 'equal)
-
-(defun minor-degree (n)
-  (cdr (assoc n +minor-degrees+)))
 
 (defconstant i-first (minor-degree 1))
 (defconstant i-second (minor-degree 2))
@@ -536,10 +539,13 @@
   `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
     ,@body))
 
-(defun octaves (count &optional (pitch 0))
+(defun octaves (count &optional (pitch 0) &rest pitch-octaves)
   (typecase pitch
     (number (+ pitch (* count 12)))
-    (keyword (make-hardcoded :pitch pitch :offset (* count 12)))))
+    (keyword (make-hardcoded :pitch pitch :offset (* count 12)))
+    (list
+     (mapcar (lambda (p o) (octaves (+ count o) p))
+	     pitch pitch-octaves))))
 
 (defun sharp (pitch)
   (typecase pitch
@@ -574,17 +580,16 @@
 		     (t #'minor-degree))
 		   degree)))
 
-;; We need some kind of way to easily add to some or all of a list, so
-;; make this shorter:
-;; (let ((chord (diatonic-chord 1)))
-;;   (list (second chord) (+ (first chord) 12) (+ (third chord) 12)))
+(defun mod-1 (number divisor)
+  (let ((result (mod number divisor)))
+    (if (zerop result) divisor result)))
 
-;; (defun diatonic-chord (degree &optional (key *base-pitch*))
-;;   (funcall (case degree
-;; 	     ((1 4 5) #'major-chord)
-;; 	     (7 #'diminished-chord)
-;; 	     (t #'minor-chord))
-;; 	   (+ (major-degree degree) key)))
+(defun diatonic-chord (degree &optional (key 0))
+  (funcall (case (mod-1 degree 7)
+	     ((1 4 5) #'major-chord)
+	     (7 #'diminished-chord)
+	     (t #'minor-chord))
+	   (+ (major-degree degree) key)))
 
 (defun typed-chord (type root)
   (ecase type

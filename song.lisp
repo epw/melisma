@@ -16,7 +16,7 @@
     (n voice a-fifth 1/2)
     (n voice (octaves 1 a-first) 1/2)
     (n voice a-fifth 1)
-    (n voice a-third 1)))
+    (n voice a-first 1)))
 
 (defun speedy (voice)
   (octave 2
