@@ -106,7 +106,12 @@
 (defstruct tuplet
   "Multiple notes taking up a different number of beats, spaced evenly. Most commonly triplet."
   notes
+  offset
   beats)
+
+(defstruct control
+  "Control functions to be executed at particular points in the playback."
+  fn)
 
 (defun count-beats (element)
   (typecase element
@@ -125,9 +130,42 @@
 	(format nil "~v@{~a~:*~}" (abs octave) (if (< octave 0) "," "'")))
       ""))
 
-(defun render-pitch (pitch &optional (offset 0))
+(alexandria:define-constant +circle-of-fifths-sharps+ '(:f :c :g :d :a :e)
+  :test 'equal)
+(alexandria:define-constant +circle-of-fifths-flats+ '(:b :e :a :d :g :c)
+  :test 'equal)
+(alexandria:define-constant +circle-of-fifths-major-right+ '(c g d a e b fis)
+  :test 'equal)
+(alexandria:define-constant +circle-of-fifths-major-left+ '(nil f bes ees aes des ges)
+  :test 'equal)
+(alexandria:define-constant +circle-of-fifths-minor-right+ '(a e b fis cis gis dis)
+  :test 'equal)
+(alexandria:define-constant +circle-of-fifths-minor-left+ '(nil d g c f bes ees)
+  :test 'equal)
+
+(defun key-intonation (pitch key)
+  (multiple-value-bind (key-sym pos) (read-from-string key)
+    (let* ((mode (read-from-string (subseq key (1+ pos))))
+	   (right (case mode
+		    (major +circle-of-fifths-major-right+)
+		    (minor +circle-of-fifths-minor-right+)))
+	   (left (case mode
+		   (major +circle-of-fifths-major-left+)
+		   (minor +circle-of-fifths-minor-left+)))
+	   (count (position key-sym right)))
+      (if count
+	  (if (member pitch (subseq +circle-of-fifths-sharps+ 0 count))
+	      (format nil "~ais" pitch)
+	      (format nil "~a" pitch))
+	  (if (member pitch (subseq +circle-of-fifths-flats+ 0 (position key-sym left)))
+	      (format nil "~aes" pitch)
+	      (format nil "~a" pitch))))))
+
+(defun render-pitch (pitch &optional (offset 0) key)
   (typecase pitch
     (string pitch)
+    (keyword
+     (format nil "~(~a~)~a" (key-intonation pitch key) (octave-marks offset)))
     (integer
      (let ((actual-pitch (+ pitch offset)))
        (format nil "~(~a~)~a"
@@ -165,13 +203,13 @@
 	      (incf (voice-current-position voice))
 	    finally (setf (voice-current-position voice) original-position)))))
 
-(defun note-value (pitch offset)
+(defun note-value (pitch offset key)
   (if (and pitch (listp pitch))
-      (mapcar (lambda (p) (render-pitch p offset)) (ensure-list pitch))
-      (list (render-pitch pitch offset))))
+      (mapcar (lambda (p) (render-pitch p offset key)) (ensure-list pitch))
+      (list (render-pitch pitch offset key))))
 
 (defun render-note (note voice)
-  (let ((note-value (note-value (note-pitch note) (note-offset note)))
+  (let ((note-value (note-value (note-pitch note) (note-offset note) (voice-key voice)))
 	(durations (render-duration (note-beats note) voice)))
     (with-output-to-string (s)
       (dolist (duration durations)
@@ -187,8 +225,8 @@
       (when (note-articulation note)
 	(format s "\\~(~a~)" (note-articulation note))))))
 
-(defun render-pitch-of-size (pitch size)
-  (let ((note-value (note-value pitch 0)))
+(defun render-pitch-of-size (pitch offset size key)
+  (let ((note-value (note-value pitch offset key)))
     (with-output-to-string (s)
       (format s "~a~{~(~a~)~^ ~}~a~a"
 	      (if (> (length note-value) 1) "<" "")
@@ -201,13 +239,15 @@
   (setf (voice-current-position voice) 0)
   (dolist (element (voice-timeline voice))
     (etypecase element
+      (control (funcall (control-fn element) voice))
       (note (format f "    ~a~%" (render-note element voice)))
       (tuplet
        (format f "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
 	       (mapcar (lambda (tuplet-note)
-			 (render-pitch-of-size tuplet-note
+			 (render-pitch-of-size tuplet-note (tuplet-offset element)
 					       (floor (voice-time-sig-lower voice)
-						      (2/ (tuplet-beats element)))))
+						      (2/ (tuplet-beats element)))
+					       (voice-key voice)))
 		       (tuplet-notes element)))))
 					;    (render-element f element voice)
     (incf (voice-current-position voice)))
@@ -320,14 +360,10 @@
 	   (funcall fill-fn voice-to-rest voice-at-point beats)
 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
-(defun calc-pitch (pitch voice)
-  (+ pitch *octave-offset* (voice-offset-note voice)))
-
 (defun n (voice pitch &optional (duration 1) tied-p articulation)
   (push (make-note :beats duration
-		   :pitch (typecase pitch
-			    (number (calc-pitch pitch voice))
-			    (list (mapcar (lambda (p) (calc-pitch p voice)) pitch)))
+		   :pitch pitch
+		   :offset (+ *octave-offset* (voice-offset-note voice))
 		   :tied-p tied-p :articulation articulation)
 	(voice-timeline voice)))
 
@@ -338,8 +374,8 @@
   (n voice nil duration))
 
 (defun triplet (voice pitch1 pitch2 pitch3 &optional (duration 1))
-  (push (make-tuplet :notes (mapcar (lambda (pitch) (calc-pitch pitch voice))
-				    (list pitch1 pitch2 pitch3)) :beats duration)
+  (push (make-tuplet :notes (list pitch1 pitch2 pitch3) :offset (+ *octave-offset* (voice-offset-note voice))
+		     :beats duration)
 	(voice-timeline voice)))
 
 (defmacro arrange-music (tempo voices &body body)
@@ -413,7 +449,7 @@
 (alexandria:define-constant +drum-bass+ "bd" :test 'equal)
 (alexandria:define-constant +drum-cym+ "crashcymbal" :test 'equal)
 
-(defconstant +major-degrees+
+(alexandria:define-constant +major-degrees+
   '((1 . 0)
     (2 . 2)
     (3 . 4)
@@ -421,7 +457,8 @@
     (5 . 7)
     (6 . 9)
     (7 . 11)
-    (8 . 12)))
+    (8 . 12))
+  :test 'equal)
 
 (defun major-degree (n)
   (cdr (assoc n +major-degrees+)))
@@ -434,7 +471,7 @@
 (defconstant a-sixth (major-degree 6))
 (defconstant a-seventh (major-degree 7))
 
-(defconstant +minor-degrees+
+(alexandria:define-constant +minor-degrees+
   '((1 . 0)
     (2 . 2)
     (3 . 3)
@@ -442,7 +479,8 @@
     (5 . 7)
     (6 . 8)
     (7 . 10)
-    (8 . 12)))
+    (8 . 12))
+  :test 'equal)
 
 (defun minor-degree (n)
   (cdr (assoc n +minor-degrees+)))
@@ -486,10 +524,18 @@
   (+ pitch (* count 12)))
 
 (defun sharp (pitch)
-  (+ pitch 1))
+  (typecase pitch
+    (keyword
+     (read-from-string (format nil "~sis" pitch)))
+    (number
+     (+ pitch 1))))
 
 (defun flat (pitch)
-  (- pitch 1))
+  (typecase pitch
+    (keyword
+     (read-from-string (format nil "~ses" pitch)))
+    (number
+     (- pitch 1))))
 
 (defun major-chord (root)
   (list root (+ root 4) (+ root 7)))
@@ -511,12 +557,12 @@
 ;; (let ((chord (diatonic-chord 1)))
 ;;   (list (second chord) (+ (first chord) 12) (+ (third chord) 12)))
 
-(defun diatonic-chord (degree &optional (key *base-pitch*))
-  (funcall (case degree
-	     ((1 4 5) #'major-chord)
-	     (7 #'diminished-chord)
-	     (t #'minor-chord))
-	   (+ (major-degree degree) key)))
+;; (defun diatonic-chord (degree &optional (key *base-pitch*))
+;;   (funcall (case degree
+;; 	     ((1 4 5) #'major-chord)
+;; 	     (7 #'diminished-chord)
+;; 	     (t #'minor-chord))
+;; 	   (+ (major-degree degree) key)))
 
 (defun typed-chord (type root)
   (ecase type
