@@ -61,8 +61,7 @@
 	   #:octaves
 	   #:flat
 	   #:sharp
-	   #:repeat
-	   #:%repeat-index))
+	   #:degree-chord))
 
 (in-package #:melisma)
 
@@ -512,26 +511,26 @@
 (defconstant i-sixth (minor-degree 6))
 (defconstant i-seventh (minor-degree 7))
 
-(defun typed-degree (major-or-minor n)
-  (ecase major-or-minor
-    (:major (major-degree n))
-    (:minor (minor-degree n))))
+(defun typed-degree (mode n)
+  (ecase mode
+    ((:major :augmented) (major-degree n))
+    ((:minor :diminished) (minor-degree n))))
 
-(defun degree-from-pitch (raw-pitch major-or-minor)
+(defun degree-from-pitch (raw-pitch mode)
   (let* ((pitch (mod raw-pitch 12))
-	 (degree (car (rassoc pitch (ecase major-or-minor
+	 (degree (car (rassoc pitch (ecase mode
 				      (:major +major-degrees+)
 				      (:minor +minor-degrees+))))))
     (if degree degree
-	(values (car (rassoc (1- pitch) (ecase major-or-minor
+	(values (car (rassoc (1- pitch) (ecase mode
 					  (:major +major-degrees+)
 					  (:minor +minor-degrees+))))
 		:sharp))))
 
-(defmacro voice-offset-degree ((voice degree-shift &optional (major-or-minor :major)) &body body)
-  `(voice-offset-set (,voice (+ (typed-degree ,major-or-minor
+(defmacro voice-offset-degree ((voice degree-shift &optional (mode :major)) &body body)
+  `(voice-offset-set (,voice (+ (typed-degree ,mode
 					      (+ ,degree-shift
-						 (degree-from-pitch (voice-offset-note ,voice) ,major-or-minor)))
+						 (degree-from-pitch (voice-offset-note ,voice) ,mode)))
 				(* 12 (floor (voice-offset-note ,voice) 12))))
      ,@body))
 
@@ -591,11 +590,14 @@
 	     (t #'minor-chord))
 	   (+ (major-degree degree) key)))
 
-(defun typed-chord (type root)
-  (ecase type
+(defun typed-chord (mode root)
+  (ecase mode
     (:major (major-chord root))
     (:minor (minor-chord root))
     (:augmented (augmented-chord root))
     (:diminished (diminished-chord root))))
+
+(defun degree-chord (mode degree)
+  (typed-chord mode (typed-degree mode degree)))
 
 ;; Example music, rather than structure
