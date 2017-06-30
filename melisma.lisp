@@ -171,6 +171,8 @@
     (string pitch)
     (keyword
      (format nil "~(~a~)~a" (key-intonation pitch key) (octave-marks offset)))
+    (hardcoded
+     (render-pitch (hardcoded-pitch pitch) (+ offset (hardcoded-offset pitch)) key))
     (integer
      (let ((actual-pitch (+ pitch offset)))
        (format nil "~(~a~)~a"
@@ -543,6 +545,8 @@
   (typecase pitch
     (keyword
      (read-from-string (format nil "~sis" pitch)))
+    (hardcoded
+     (make-hardcoded :pitch (sharp (hardcoded-pitch pitch)) :offset (hardcoded-offset pitch)))
     (number
      (+ pitch 1))))
 
@@ -550,6 +554,8 @@
   (typecase pitch
     (keyword
      (read-from-string (format nil "~ses" pitch)))
+    (hardcoded
+     (make-hardcoded :pitch (flat (hardcoded-pitch pitch)) :offset (hardcoded-offset pitch)))
     (number
      (- pitch 1))))
 
