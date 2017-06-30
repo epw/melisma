@@ -109,6 +109,11 @@
   offset
   beats)
 
+(defstruct hardcoded
+  "Temporary structure describing a hardcoded note such as C, with an offset for octaves."
+  pitch
+  offset)
+
 (defstruct control
   "Control functions to be executed at particular points in the playback."
   fn)
@@ -208,16 +213,19 @@
       (mapcar (lambda (p) (render-pitch p offset key)) (ensure-list pitch))
       (list (render-pitch pitch offset key))))
 
+(defun common-note-render (s note-value duration)
+  (format s "~a~{~(~a~)~^ ~}~a~a"
+	  (if (> (length note-value) 1) "<" "")
+	  note-value
+	  (if (> (length note-value) 1) ">" "")
+	  duration))
+
 (defun render-note (note voice)
   (let ((note-value (note-value (note-pitch note) (note-offset note) (voice-key voice)))
 	(durations (render-duration (note-beats note) voice)))
     (with-output-to-string (s)
       (dolist (duration durations)
-	(format s "~a~{~(~a~)~^ ~}~a~a"
-		(if (> (length note-value) 1) "<" "")
-		note-value
-		(if (> (length note-value) 1) ">" "")
-		duration)
+	(common-note-render s note-value duration)
 	(unless (eq duration (car (last durations)))
 	  (format s "~~")))
       (when (note-tied-p note)
@@ -226,13 +234,15 @@
 	(format s "\\~(~a~)" (note-articulation note))))))
 
 (defun render-pitch-of-size (pitch offset size key)
-  (let ((note-value (note-value pitch offset key)))
+  (let* ((offset (typecase pitch
+		   (hardcoded (+ offset (hardcoded-offset pitch)))
+		   (t offset)))
+	 (pitch (typecase pitch
+		  (hardcoded (hardcoded-pitch pitch))
+		  (t pitch)))
+	 (note-value (note-value pitch offset key)))
     (with-output-to-string (s)
-      (format s "~a~{~(~a~)~^ ~}~a~a"
-	      (if (> (length note-value) 1) "<" "")
-	      note-value
-	      (if (> (length note-value) 1) ">" "")
-	      size))))
+      (common-note-render s note-value size))))
 
 (defun render (f voice)
   (format f "        {~%")
@@ -249,7 +259,6 @@
 						      (2/ (tuplet-beats element)))
 					       (voice-key voice)))
 		       (tuplet-notes element)))))
-					;    (render-element f element voice)
     (incf (voice-current-position voice)))
   (format f "        }~%"))
 
@@ -361,11 +370,16 @@
 	   (push (make-note :beats beats :pitch nil) (voice-timeline voice-to-rest)))))
 
 (defun n (voice pitch &optional (duration 1) tied-p articulation)
-  (push (make-note :beats duration
-		   :pitch pitch
-		   :offset (+ *octave-offset* (voice-offset-note voice))
-		   :tied-p tied-p :articulation articulation)
-	(voice-timeline voice)))
+  (typecase pitch
+    (hardcoded
+     (let ((*octave-offset* (+ *octave-offset* (hardcoded-offset pitch))))
+       (n voice (hardcoded-pitch pitch) duration tied-p articulation)))
+    (t
+     (push (make-note :beats duration
+		      :pitch pitch
+		      :offset (+ *octave-offset* (voice-offset-note voice))
+		      :tied-p tied-p :articulation articulation)
+	   (voice-timeline voice)))))
 
 (defun s (voice pitch &optional (duration 1))
   (n voice pitch duration nil "staccato"))
@@ -521,7 +535,9 @@
     ,@body))
 
 (defun octaves (count &optional (pitch 0))
-  (+ pitch (* count 12)))
+  (typecase pitch
+    (number (+ pitch (* count 12)))
+    (keyword (make-hardcoded :pitch pitch :offset (* count 12)))))
 
 (defun sharp (pitch)
   (typecase pitch
