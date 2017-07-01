@@ -72,6 +72,7 @@
   (time-sig "4/4")
   clef
   middle-c
+  midi-range
   (timeline ())
   current-position)
 (defun time-sig-lower (time-sig)
@@ -250,7 +251,7 @@
   (setf (voice-current-position voice) 0)
   (dolist (element (voice-timeline voice))
     (etypecase element
-      (control (funcall (control-fn element) voice))
+      (control (funcall (control-fn element) voice f))
       (note (format f "    ~a~%" (render-note element voice)))
       (tuplet
        (format f "    \\tuplet ~a/~a { ~{~a ~}}~%" (length (tuplet-notes element)) 2
@@ -266,7 +267,10 @@
 (defun render-voice-attrs (voice)
   (with-output-to-string (s)
     (when (voice-middle-c voice)
-      (format s "    \\set Staff.middleCPosition = #~d~%" (voice-middle-c voice)))))
+      (format s "    \\set Staff.middleCPosition = #~d~%" (voice-middle-c voice)))
+    (when (voice-midi-range voice)
+      (format s "    \\set Staff.midiMinimumVolume = #~d~%" (car (voice-midi-range voice)))
+      (format s "    \\set Staff.midiMaximumVolume = #~d~%" (cdr (voice-midi-range voice))))))
 
 (defun render-voice (stream voice tempo)
   (setf (voice-timeline voice) (nreverse (voice-timeline voice)))
@@ -428,7 +432,10 @@
 ;; 	 120 ((*default-voice* melody)) ,@body)))
 
 (defmacro play ((&rest voices) &body body)
-  `(play-lilypond (arrange-music 120 ,voices ,@body)))
+  `(play-lilypond (arrange-music
+		      ,(if (numberp (first voices)) (first voices) 120)
+		      ,(if (numberp (first voices)) (rest voices) voices)
+		    ,@body)))
 
 (defmacro show ((&rest voices) &body body)
   `(let ((*articulate-p* nil))
