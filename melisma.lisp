@@ -2,6 +2,7 @@
   (:use #:cl #:eric)
   (:export #:*input*
 	   #:make-voice
+	   #:make-drums
 	   #:make-note
 	   #:show-sheet-music
 	   #:voice-catch-up
@@ -61,7 +62,10 @@
 	   #:octaves
 	   #:flat
 	   #:sharp
-	   #:degree-chord))
+	   #:degree-chord
+	   #:+drum-snare+
+	   #:+drum-bass+
+	   #:+drum-cym+))
 
 (in-package #:melisma)
 
@@ -405,7 +409,7 @@
 					 collect
 					   (if (listp voice) (list 'cons (list 'quote (car voice)) (cadr voice))
 					       (list 'cons (list 'quote voice)
-						     (if (eq voice 'drums)
+						     (if (string= (symbol-name voice) "DRUMS")
 							 '(make-drums)
 							 '(make-voice)))))))
 			   ,@(loop for voice in voices
