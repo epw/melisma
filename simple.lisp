@@ -30,18 +30,17 @@
     (n drums nil 1)
     (n drums +drum-snare+ 1/2)
     (triplet drums +drum-snare+ +drum-snare+ +drum-snare+ 1/2)
-    (n drums +drum-snare+ 1/4)
     
     (voice-catch-up bass melody)
     (sequ melody 0 t)
     (sequ melody 3 t)
     (sequ melody 0 t)
     (n melody (major-chord a-fourth) 2)
-    (n melody (major-chord a-second) 2)
+    (n melody (major-chord a-fifth) 2)
+    (n melody (major-chord a-sixth) 2)
     (n bass (degree-chord :major 1) 4)
     (n bass (degree-chord :major 4) 4)
     (n bass (degree-chord :major 1) 4)))
-    
 
 (defun main ()
   (play-lilypond (simple)))
