@@ -1,0 +1,5 @@
+Make a version (or something) that doesn't rely on :eric and uses
+command-line flags for the locations of binaries it calls out to and
+directories to use. Investigate packaging with :alexandria and maybe
+SBCL, or otherwise see if it can be easy to say "Install SBCL then run
+this, presenting programs with these flagss."
