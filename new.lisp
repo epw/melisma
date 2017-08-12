@@ -33,14 +33,16 @@
       (dolist (degree order)
 	(n bass (degree-chord :major degree) 2)))
 
-    (dotimes (i 8)
-      (if (= i 0)
-	  (r drums 4)
-	  (n drums +drum-snare+ 4))
-      (n melody (first (degree-chord :major 1)) 1)
-      (n melody (second (degree-chord :major 1)) 1)
-      (n melody (third (degree-chord :major 1)) 1)
-      (n melody (octaves 1 (first (degree-chord :major 1))) 1))))
+    (n melody (first (degree-chord :major 1)) 1)
+    (n melody (second (degree-chord :major 1)) 1)
+    (n melody (third (degree-chord :major 1)) 1)
+    (n melody (octaves 1 (first (degree-chord :major 1))) 1)
+
+    (n melody (octaves 1 (first (degree-chord :major 1))) 1)
+    (n melody (third (degree-chord :major 1)) 1)
+    (n melody (second (degree-chord :major 1)) 1)
+    (n melody (first (degree-chord :major 1)) 1)
+    ))
 
     
     ;; (sequ melody 0)
