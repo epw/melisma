@@ -17,7 +17,7 @@
     (n voice (if chords-p (list a-fifth (octaves 1 a-first)) a-fifth) 3/2)))
 
 (defun simple ()
-  (arrange-music 120 ((melody (make-voice :instrument "electric piano 2" :offset-note (octaves 1)))
+  (arrange-music 120 ((melody (make-voice :instrument "flute" :offset-note (octaves 2)))
 		      (bass (make-voice :instrument "electric piano 2"))
 		      drums)
 
