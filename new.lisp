@@ -24,27 +24,35 @@
 		       collect (cons element combination)))))
 
 (defun new ()
-  (arrange-music 120 ((melody (make-voice :instrument "violin" :offset-note (octaves 1)))
-		      (bass (make-voice :instrument "orchestral harp" :offset-note (octaves 1)))
-		      drums)
+  (arrange-music 60 ((melody (make-voice :instrument "pan flute" :offset-note (octaves 2)))
+		     (bass (make-voice :instrument "orchestral harp" :offset-note (octaves 1)))
+		     drums)
 
     (dolist (order (subseq (comb '(1 4 5 6)) 0 4))
       (print order)
       (dolist (degree order)
-	(n bass (degree-chord :major degree) 2)))
+	(n bass (degree-chord :major degree) 1)))
 
-    (n melody (first (degree-chord :major 1)) 1)
-    (n melody (second (degree-chord :major 1)) 1)
-    (n melody (third (degree-chord :major 1)) 1)
-    (n melody (octaves 1 (first (degree-chord :major 1))) 1)
+    (dotimes (_ 2)
+      (r melody 4)
+      (n melody (first (degree-chord :major 1)))
+      (n melody (second (degree-chord :major 1)))
+      (n melody (+ 2 (first (degree-chord :major 1))))
+      (n melody (octaves -1 (third (degree-chord :major 1)))))
 
-    (n melody (octaves 1 (first (degree-chord :major 1))) 1)
-    (n melody (third (degree-chord :major 1)) 1)
-    (n melody (second (degree-chord :major 1)) 1)
-    (n melody (first (degree-chord :major 1)) 1)
     ))
-
     
+    ;; (n melody (first (degree-chord :major 1)) 1)
+    ;; (n melody (second (degree-chord :major 1)) 1)
+    ;; (n melody (third (degree-chord :major 1)) 1)
+    ;; (n melody (octaves 1 (first (degree-chord :major 1))) 1)
+
+    ;; (n melody (octaves 1 (first (degree-chord :major 1))) 1)
+    ;; (n melody (third (degree-chord :major 1)) 1)
+    ;; (n melody (second (degree-chord :major 1)) 1)
+    ;; (n melody (first (degree-chord :major 1)) 1)
+    ;; ))
+
     ;; (sequ melody 0)
     ;; (sequ melody 3)
     ;; (sequ melody 0)
