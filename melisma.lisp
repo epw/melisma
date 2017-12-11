@@ -7,6 +7,7 @@
 	   #:show-sheet-music
 	   #:voice-catch-up
 	   #:arrange-music
+	   #:lilypond-main
 	   #:play-lilypond
 	   #:make-music
 	   #:do-music
@@ -325,6 +326,12 @@
 				:output output
 				:error output)))
 	(apply #'shell-show-errors command (if extension (file-ext filename extension) filename) other-args))))
+
+(defvar *lilypond-action* #'play-lilypond
+  "A variable so invoking the MAIN of a song file can do the right thing depending on client location")
+
+(defun lilypond-main (lilypond-string &optional (filename "/tmp/melisma"))
+  (funcall *lilypond-action* lilypond-string filename))
 
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "timidity" :midi filename))

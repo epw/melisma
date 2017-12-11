@@ -30,8 +30,4 @@
     ;; (n melody i-second)
     ;; (n melody i-first 2)))
 
-(defun main ()
-  (play-lilypond (tithe)))
-
-(main)
-
+(lilypond-main (tithe))

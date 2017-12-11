@@ -73,8 +73,4 @@
     ;; (n bass (degree-chord :major 4) 4)
     ;; (n bass (degree-chord :major 1) 4)))
 
-(defun main ()
-  (play-lilypond (new)))
-
-(main)
-
+(lilypond-main (new))

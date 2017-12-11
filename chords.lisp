@@ -46,9 +46,4 @@
       (n melody a-fifth)
       (n melody (octaves 1 a-fifth)))))
 
-
-(defun main ()
-  (play-lilypond (chords)))
-
-(main)
-
+(lilypond-main (chords))

@@ -28,8 +28,4 @@
       (n m /E 1/2)
       (n m /B 1/2))))
 
-
-(defun main ()
-  (play-lilypond (wizards-walk)))
-
-(main)
+(lilypond-main (wizards-walk))

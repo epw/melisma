@@ -30,7 +30,4 @@
     (triplet melody (octaves -1 :f) (octaves -1 (sharp :b)) :d)
     (dotimes (i 2) (n bass (list (octaves -2 :g) (octaves -1 :g)) 2))))
 
-(defun main ()
-  (play-lilypond (moonlight)))
-
-(main)
+(lilypond-main (moonlight))

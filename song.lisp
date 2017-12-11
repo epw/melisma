@@ -69,8 +69,4 @@
 
       (speedy melody)))
 
-(defun main ()
-  (play-lilypond (song)))
-
-(main)
-
+(lilypond-main (song))

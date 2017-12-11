@@ -46,8 +46,4 @@
     (i-get-off melody 1/2)
     ))
 
-(defun main ()
-  (play-lilypond (snippets)))
-
-(main)
-
+(lilypond-main (snippets))
