@@ -340,11 +340,12 @@
   (consume-lilypond lilypond-string "evince" :pdf filename))
 
 (defun lilypond-ogg (lilypond-string &optional (filename "/tmp/melisma"))
-  (consume-lilypond lilypond-string "timidity" :midi filename (list "-Ov")))
+  (consume-lilypond lilypond-string "timidity" :midi filename (list "-Ov"))
+  (format t "Wrote ~a~%" (file-ext filename :ogg)))
 
 (defun shell (command &rest args)
   (let* ((output (make-string-output-stream))
-	 (process (sb-ext:run-program "/usr/bin/env" (print (cons command args))
+	 (process (sb-ext:run-program "/usr/bin/env" (cons command args)
 				      :output output
 				      :error output)))
     (values (sb-ext:process-exit-code process)
