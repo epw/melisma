@@ -25,8 +25,7 @@
 
 (defun new ()
   (arrange-music 60 ((melody (make-voice :instrument "pan flute" :offset-note (octaves 2)))
-		     (bass (make-voice :instrument "orchestral harp" :offset-note (octaves 1)))
-		     drums)
+		     (bass (make-voice :instrument "orchestral harp" :offset-note (octaves 1))))
 
     (dolist (order (subseq (comb '(1 4 5 6)) 0 4))
       (print order)

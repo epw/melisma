@@ -13,7 +13,7 @@
 (defun tithe ()
   (arrange-music 120 ((melody (make-voice :instrument "acoustic grand" :offset-note (octaves 1)))
 		     drums)
-
+    (declare (ignore drums))
     (n melody i-first) ; when
     (n melody i-second) ; the
     (n melody i-third 2) ; tithe
