@@ -327,12 +327,6 @@
 				:error output)))
 	(apply #'shell-show-errors command (if extension (file-ext filename extension) filename) other-args))))
 
-(defvar *lilypond-action* #'play-lilypond
-  "A variable so invoking the MAIN of a song file can do the right thing depending on client location")
-
-(defun lilypond-main (lilypond-string &optional (filename "/tmp/melisma"))
-  (funcall *lilypond-action* lilypond-string filename))
-
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "timidity" :midi filename))
 
@@ -342,6 +336,12 @@
 (defun lilypond-ogg (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "timidity" :midi filename (list "-Ov"))
   (format t "Wrote ~a~%" (file-ext filename :ogg)))
+
+(defvar *lilypond-action* #'play-lilypond
+  "A variable so invoking the MAIN of a song file can do the right thing depending on client location")
+
+(defun lilypond-main (lilypond-string &optional (filename "/tmp/melisma"))
+  (funcall *lilypond-action* lilypond-string filename))
 
 (defun shell (command &rest args)
   (let* ((output (make-string-output-stream))
@@ -621,5 +621,31 @@
 
 (defun degree-chord (mode degree)
   (typed-chord mode (typed-degree mode degree)))
+
+(defun slide-chord (chord direction &optional (times 1))
+  (if (< times 0)
+      (slide-chord chord (ecase direction (:up :down) (:down :up)) (* -1 times))
+      (let* ((first t)
+	     (op (ecase direction
+		   (:up #'+)
+		   (:down #'-)))
+	     (comp (ecase direction
+		     (:up #'<)
+		     (:down #'>)))
+	     (new-chord
+	      (sort (mapcar (lambda (n) (if first
+					    (progn (setf first nil)
+						   (funcall op n 12))
+					    n))
+			    (sort chord comp))
+		    comp)))
+	(if (> times 1)
+	    (slide-chord new-chord direction (1- times))
+	    new-chord))))
+
+(defun raise (chord &optional (times 1))
+  (slide-chord chord :up times))
+(defun lower (chord &optional (times 1))
+  (slide-chord chord :down times))
 
 ;; Example music, rather than structure
