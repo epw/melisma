@@ -63,10 +63,7 @@
 	   #:octaves
 	   #:flat
 	   #:sharp
-	   #:degree-chord
-	   #:+drum-snare+
-	   #:+drum-bass+
-	   #:+drum-cym+))
+	   #:degree-chord))
 
 (in-package #:melisma)
 
@@ -481,10 +478,6 @@
 (defconstant @G 5)
 (defconstant @A 6)
 (defconstant @B 7)
-
-(alexandria:define-constant +drum-snare+ "sn" :test 'equal)
-(alexandria:define-constant +drum-bass+ "bd" :test 'equal)
-(alexandria:define-constant +drum-cym+ "crashcymbal" :test 'equal)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (alexandria:define-constant +major-degrees+
