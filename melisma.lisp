@@ -63,7 +63,9 @@
 	   #:octaves
 	   #:flat
 	   #:sharp
-	   #:degree-chord))
+	   #:degree-chord
+	   #:raise
+	   #:lower))
 
 (in-package #:melisma)
 
