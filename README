@@ -1,0 +1,8 @@
+I know a lot more about chords now. The foundation in melisma.lisp is
+pretty good, but some parts of it might be too messy. In particular,
+it would be nice if it were easier to change chords and octaves
+separately. I'm close, but think they get combined too much.
+
+
+
+https://en.wikipedia.org/wiki/Roman_numeral_analysis

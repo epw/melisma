@@ -446,6 +446,7 @@
 ;; 	 120 ((*default-voice* melody)) ,@body)))
 
 (defmacro play ((&rest voices) &body body)
+  "Very simple usage: (play (m) (n m /C))"
   `(play-lilypond (arrange-music
 		      ,(if (numberp (first voices)) (first voices) 120)
 		      ,(if (numberp (first voices)) (rest voices) voices)
@@ -644,3 +645,15 @@
   (slide-chord chord :down times))
 
 ;; Example music, rather than structure
+
+;; (play ((m (make-voice :instrument melisma-instruments:+acoustic-grand+)))
+;; 	   (labels ((p (degree &optional duration staccato-p ) (if staccato-p (s m (diatonic-chord degree) duration)
+;; 								   (n m (diatonic-chord degree) duration))))
+;; 	     (octave -1 
+;; 	       (p 2 1/2 t)
+;; 	       (p 2 1/4)
+;; 	       (p 2 1/4)
+;; 	       (r m 1/4)
+;; 	       (p 2 1/2)
+;; 	       (p 4 1/2)
+;; 	       (p 5 1/2))))
