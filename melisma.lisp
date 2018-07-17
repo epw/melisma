@@ -619,25 +619,26 @@
   (typed-chord mode (typed-degree mode degree)))
 
 (defun slide-chord (chord direction &optional (times 1))
-  (if (< times 0)
-      (slide-chord chord (ecase direction (:up :down) (:down :up)) (* -1 times))
-      (let* ((first t)
-	     (op (ecase direction
-		   (:up #'+)
-		   (:down #'-)))
-	     (comp (ecase direction
-		     (:up #'<)
-		     (:down #'>)))
-	     (new-chord
-	      (sort (mapcar (lambda (n) (if first
-					    (progn (setf first nil)
-						   (funcall op n 12))
-					    n))
-			    (sort chord comp))
-		    comp)))
-	(if (> times 1)
-	    (slide-chord new-chord direction (1- times))
-	    new-chord))))
+  (cond ((zerop times) chord)
+	((< times 0)
+	 (slide-chord chord (ecase direction (:up :down) (:down :up)) (* -1 times))
+	 (let* ((first t)
+		(op (ecase direction
+		      (:up #'+)
+		      (:down #'-)))
+		(comp (ecase direction
+			(:up #'<)
+			(:down #'>)))
+		(new-chord
+		 (sort (mapcar (lambda (n) (if first
+					       (progn (setf first nil)
+						      (funcall op n 12))
+					       n))
+			       (sort chord comp))
+		       comp)))
+	   (if (> times 1)
+	       (slide-chord new-chord direction (1- times))
+	       new-chord)))))
 
 (defun raise (chord &optional (times 1))
   (slide-chord chord :up times))
