@@ -5,7 +5,6 @@
 	   #:make-drums
 	   #:make-note
 	   #:show-sheet-music
-	   #:voice-catch-up
 	   #:arrange-music
 	   #:lilypond-main
 	   #:play-lilypond
@@ -15,6 +14,8 @@
 	   #:music-beats
 	   #:voice-offset-set
 	   #:voice-offset-inc
+	   #:voice-let-key
+	   #:voice-set-key
 	   #:voice-catch-up
 	   #:n
 	   #:s
@@ -72,6 +73,7 @@
 (defstruct voice
   (instrument "acoustic grand")
   (offset-note 0)
+  (octave 0)
   (key "c \\major")
   (time-sig "4/4")
   clef
@@ -94,11 +96,11 @@
 (defun beats-remaining-in-measure (voice)
   (- (voice-measure-beats voice)
      (mod (voice-position voice) (voice-time-sig-upper voice))))
+(defun voice-octave-offset (voice)
+  (* (voice-octave voice) 12))
 
 (defun make-drums (&key (time-sig "4/4"))
   (make-voice :instrument "drums" :time-sig time-sig))
-
-(defvar *octave-offset* 0)
 
 (defstruct note
   beats
@@ -379,6 +381,12 @@
 (defmacro voice-offset-inc ((voice shift) &body body)
   `(voice-offset-set (,voice (+ (voice-offset-note ,voice) ,shift)) ,@body))
 
+(defmacro voice-let-key ((voice key) &body body)
+  `(voice-offset-set (,voice ,key) ,@body))
+
+(defun voice-set-key (voice key)
+  (setf (voice-offset-note voice) key))
+
 (defun voice-catch-up (voice-to-rest voice-at-point &optional fill-fn)
   (loop while (< (voice-position voice-to-rest) (voice-position voice-at-point))
      for beats = (min (- (voice-position voice-at-point) (voice-position voice-to-rest))
@@ -391,12 +399,15 @@
 (defun n (voice pitch &optional (duration 1) tied-p articulation)
   (typecase pitch
     (hardcoded
-     (let ((*octave-offset* (+ *octave-offset* (hardcoded-offset pitch))))
-       (n voice (hardcoded-pitch pitch) duration tied-p articulation)))
+     (push (make-note :beats duration
+		      :pitch (hardcoded-pitch pitch)
+		      :offset (hardcoded-offset pitch)
+		      :tied-p tied-p :articulation articulation)
+	   (voice-timeline voice)))
     (t
      (push (make-note :beats duration
 		      :pitch pitch
-		      :offset (+ *octave-offset* (voice-offset-note voice))
+		      :offset (+ (voice-octave-offset voice) (voice-offset-note voice))
 		      :tied-p tied-p :articulation articulation)
 	   (voice-timeline voice)))))
 
@@ -407,7 +418,7 @@
   (n voice nil duration))
 
 (defun triplet (voice pitch1 pitch2 pitch3 &optional (duration 1))
-  (push (make-tuplet :notes (list pitch1 pitch2 pitch3) :offset (+ *octave-offset* (voice-offset-note voice))
+  (push (make-tuplet :notes (list pitch1 pitch2 pitch3) :offset (+ (voice-octave-offset voice) (voice-offset-note voice))
 		     :beats duration)
 	(voice-timeline voice)))
 
@@ -455,6 +466,10 @@
 (defmacro show ((&rest voices) &body body)
   `(let ((*articulate-p* nil))
      (show-lilypond (arrange-music 120 ,voices ,@body))))
+
+(defmacro lilypond-string ((&rest voices) &body body)
+  `(let ((*articulate-p* nil))
+     (format t "~a" (arrange-music 120 ,voices ,@body))))
 
 (defvar *mp3-file* "/home/eric/www/melisma-output.mp3")
 (defmacro produce-mp3 (tempo voices &body body)
@@ -553,8 +568,10 @@
      ,@body))
 
 (defmacro octave (shift &body body)
-  `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
-    ,@body))
+  (declare (ignore shift body))
+  `(print "OCTAVE doesn't work anymore. Replace with ?"))
+;;  `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
+;;    ,@body))
 
 (defun octaves (count &optional (pitch 0) &rest pitch-octaves)
   (typecase pitch
@@ -621,7 +638,8 @@
 (defun slide-chord (chord direction &optional (times 1))
   (cond ((zerop times) chord)
 	((< times 0)
-	 (slide-chord chord (ecase direction (:up :down) (:down :up)) (* -1 times))
+	 (slide-chord chord (ecase direction (:up :down) (:down :up)) (* -1 times)))
+	(t
 	 (let* ((first t)
 		(op (ecase direction
 		      (:up #'+)
