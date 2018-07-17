@@ -625,6 +625,20 @@
 	     (t #'minor-chord))
 	   (+ (major-degree degree) key)))
 
+(defun ionian-chord (degree &optional (key 0))
+  (funcall (case (mod-1 degree 7)
+	     ((1 4 5) #'major-chord)
+	     (7 #'diminished-chord)
+	     (t #'minor-chord))
+	   (+ (major-degree degree) key)))
+
+(defun aeolian-chord (degree &optional (key 0))
+  (funcall (case (mod-1 degree 7)
+	     ((1 3 4) #'major-chord)
+	     (6 #'augmented-chord)
+	     (t #'minor-chord))
+	   (+ (major-degree degree) key)))
+
 (defun typed-chord (mode root)
   (ecase mode
     (:major (major-chord root))
