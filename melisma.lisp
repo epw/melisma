@@ -70,6 +70,9 @@
 
 (in-package #:melisma)
 
+(alexandria:define-constant +timidity-other-args+ '("--noise-shaping=1")
+  :test 'equal)
+
 (defstruct voice
   (instrument "acoustic grand")
   (offset-note 0)
@@ -329,7 +332,7 @@
 	(apply #'shell-show-errors command (if extension (file-ext filename extension) filename) other-args))))
 
 (defun play-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
-  (consume-lilypond lilypond-string "timidity" :midi filename))
+  (consume-lilypond lilypond-string "timidity" :midi filename +timidity-other-args+))
 
 (defun show-lilypond (lilypond-string &optional (filename "/tmp/melisma"))
   (consume-lilypond lilypond-string "evince" :pdf filename))
@@ -573,13 +576,21 @@
 ;;  `(let ((*octave-offset* (+ *octave-offset* ,(* shift 12))))
 ;;    ,@body))
 
+(defun extend-list (list-to-extend length-to-reach &optional fill-value)
+  (let ((current-length (length list-to-extend)))
+    (cond ((listp length-to-reach) (extend-list list-to-extend (length length-to-reach) fill-value))
+	  ((< length-to-reach current-length) list-to-extend)
+	  (t
+	   (append list-to-extend (make-list (- length-to-reach (length list-to-extend))
+					     :initial-element fill-value))))))
+
 (defun octaves (count &optional (pitch 0) &rest pitch-octaves)
   (typecase pitch
     (number (+ pitch (* count 12)))
     (keyword (make-hardcoded :pitch pitch :offset (* count 12)))
     (list
      (mapcar (lambda (p o) (octaves (+ count o) p))
-	     pitch pitch-octaves))))
+	     pitch (extend-list pitch-octaves pitch 0)))))
 
 (defun sharp (pitch)
   (typecase pitch
@@ -690,3 +701,5 @@
 ;; 	       (p 2 1/2)
 ;; 	       (p 4 1/2)
 ;; 	       (p 5 1/2))))
+
+(load (compile-file "melisma-instruments.lisp"))
