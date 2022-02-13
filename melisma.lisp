@@ -8,6 +8,7 @@
 	   #:arrange-music
 	   #:lilypond-main
 	   #:play-lilypond
+	   #:lilypond-ogg
 	   #:make-music
 	   #:do-music
 	   #:produce-mp3
@@ -338,7 +339,7 @@
   (consume-lilypond lilypond-string "evince" :pdf filename))
 
 (defun lilypond-ogg (lilypond-string &optional (filename "/tmp/melisma"))
-  (consume-lilypond lilypond-string "timidity" :midi filename (list "-Ov"))
+  (consume-lilypond lilypond-string "timidity" :midi filename (cons "-Ov" +timidity-other-args+))
   (format t "Wrote ~a~%" (file-ext filename :ogg)))
 
 (defvar *lilypond-action* #'play-lilypond
