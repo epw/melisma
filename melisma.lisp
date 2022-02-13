@@ -1,3 +1,7 @@
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (ql:quickload '("alexandria")
+		:quiet t))
+
 (defpackage #:melisma
   (:use #:cl #:eric)
   (:export #:*input*
